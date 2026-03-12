@@ -20,7 +20,7 @@ conn = psycopg2.connect(
 cur = conn.cursor()
 
 # Load JSON
-with open("./app/extract/output.json", "r", encoding="utf-8") as f:
+with open("./app/extract_doc/output_doc.json", "r", encoding="utf-8") as f:
     data = json.load(f)
 
 # Validate bằng Pydantic
