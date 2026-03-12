@@ -1,0 +1,205 @@
+EduCare AI – Project Context
+
+1. Project Goal
+   This project builds an AI-powered educational knowledge system that converts textbook PDFs into structured knowledge and enables AI tutoring through Retrieval-Augmented Generation (RAG).
+
+The system extracts structured data from textbooks, stores it in PostgreSQL, generates embeddings for semantic search, and allows an AI tutor to answer questions based on the extracted knowledge.
+
+2. Core Pipeline
+
+PDF Textbook
+→ LlamaExtract
+→ Structured JSON (output.json)
+→ Pydantic Validation
+→ PostgreSQL Relational Database
+→ Embedding Generation
+→ pgvector Semantic Search
+→ LLM Answer Generation
+
+3. Document Extraction
+
+Extraction is performed using LlamaExtract.
+
+Main file:
+app/extract/extract_document.py
+
+The extractor reads a textbook PDF and converts it into structured JSON according to a predefined schema.
+
+Extraction settings:
+
+* extraction_mode: MULTIMODAL
+* extract_model: openai-gpt-4-1
+* chunk_mode: SECTION
+* cite_sources: True
+* citation_bbox: True
+
+The system prompt enforces strict hierarchical extraction:
+
+Book → Chapters → Lessons → Sections → Subsections → Content Blocks
+
+4. JSON Schema Structure
+
+Top-level schema:
+
+book_name
+chapters[]
+
+Chapter:
+
+* chapter_number
+* title
+* lessons[]
+
+Lesson:
+
+* lesson_number
+* title
+* keywords[]
+* section[]
+
+Section:
+
+* section_number
+* section_title
+* subsections[]
+
+Subsection:
+
+* subsection_number
+* subsection_title
+* content_blocks[]
+
+Content blocks contain the actual text paragraphs extracted from the textbook.
+
+Example structure:
+
+{
+"book_name": "...",
+"chapters": [
+{
+"chapter_number": "1",
+"title": "...",
+"lessons": [
+{
+"lesson_number": "1",
+"title": "...",
+"keywords": [],
+"section": [
+{
+"section_number": "1",
+"section_title": "...",
+"subsections": [
+{
+"subsection_number": "1",
+"subsection_title": "...",
+"content_blocks": [
+"paragraph text..."
+]
+}
+]
+}
+]
+}
+]
+}
+]
+}
+
+5. Database Architecture
+
+The relational database mirrors the hierarchical structure.
+
+Tables:
+
+books
+chapters
+lessons
+keywords
+sections
+subsections
+content_blocks
+
+Relationships:
+
+books → chapters
+chapters → lessons
+lessons → sections
+sections → subsections
+subsections → content_blocks
+
+The table content_blocks stores the main textual data used for AI retrieval.
+
+6. Embedding Storage
+
+Semantic search is implemented using pgvector.
+
+Embedding column:
+
+content_blocks.embedding VECTOR(1536)
+
+Embedding model:
+
+text-embedding-3-small
+
+This dimension is chosen because pgvector IVFFLAT index does not support dimensions greater than 2000.
+
+Vector index:
+
+CREATE INDEX content_embedding_idx
+ON content_blocks
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+
+7. Retrieval-Augmented Generation (RAG)
+
+When a user asks a question:
+
+1. The question is converted into an embedding.
+2. PostgreSQL vector search finds the most relevant content_blocks.
+3. The retrieved content is passed to the LLM as context.
+4. The LLM generates an answer based on textbook knowledge.
+
+Query example:
+
+SELECT content
+FROM content_blocks
+ORDER BY embedding <=> query_embedding
+LIMIT 5;
+
+8. Directory Structure
+
+app/
+
+extract/
+extract_document.py
+
+models/
+models.py
+
+database/
+schema.sql
+insert_database.py
+
+rag/
+embed_content.py
+search.py
+ask_ai.py
+
+output/
+output.json
+
+9. Important Design Decisions
+
+* Only content_blocks are embedded to achieve better semantic retrieval granularity.
+* Extraction uses SECTION chunk mode to maintain textbook structure.
+* Pydantic is used to validate LLM output before database insertion.
+* PostgreSQL + pgvector is used instead of an external vector database.
+
+10. System Purpose
+
+The final system will act as an AI tutor capable of:
+
+* answering questions about textbook content
+* explaining concepts
+* retrieving relevant passages
+* providing context-aware educational explanations

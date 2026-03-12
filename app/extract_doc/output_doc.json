@@ -1,0 +1,349 @@
+{
+    "book_name": "Trí tuệ nhân tạo",
+    "chapters": [
+        {
+            "chapter_number": "1",
+            "title": "Học máy và học sâu",
+            "lessons": [
+                {
+                    "lesson_number": "1",
+                    "title": "Giới thiệu về học máy",
+                    "keywords": null,
+                    "section": [
+                        {
+                            "section_number": "1",
+                            "section_title": "Khái niệm học máy",
+                            "subsections": [
+                                {
+                                    "subsection_number": "1.1",
+                                    "subsection_title": "Định nghĩa",
+                                    "content_blocks": [
+                                        "Học máy (Machine Learning) là một nhánh của Artificial Intelligence tập trung vào việc phát triển các thuật toán cho phép máy tính tự học từ dữ liệu và cải thiện hiệu suất theo thời gian mà không cần lập trình tường minh cho từng nhiệm vụ.",
+                                        "Theo định nghĩa kinh điển của Tom M. Mitchell:",
+                                        "“Một chương trình máy tính được nói là học từ kinh nghiệm E đối với một số nhiệm vụ T và thước đo hiệu suất P, nếu hiệu suất của nó trong nhiệm vụ T, được đo bằng P, được cải thiện nhờ kinh nghiệm E.”"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "1.2",
+                                    "subsection_title": "Ví dụ minh họa",
+                                    "content_blocks": [
+                                        "Nhiệm vụ (T)         | Kinh nghiệm (E)      | Thước đo (P)",
+                                        "-------------------- | -------------------- | -------------------",
+                                        "Phân loại email spam | Tập dữ liệu email    | Độ chính xác",
+                                        "Nhận diện khuôn mặt  | Tập ảnh khuôn mặt    | Accuracy / F1-score",
+                                        "Dự đoán giá nhà      | Dữ liệu bất động sản | Sai số MSE"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "2",
+                            "section_title": "Vai trò của học máy",
+                            "subsections": [
+                                {
+                                    "subsection_number": "2.1",
+                                    "subsection_title": "Tại sao cần học máy",
+                                    "content_blocks": [
+                                        "Trong nhiều bài toán thực tế, việc lập trình các quy tắc thủ công là rất khó hoặc không khả thi. Dữ liệu ngày càng lớn và phức tạp khiến cho các phương pháp truyền thống không còn hiệu quả.",
+                                        "Học máy cho phép hệ thống tự động phát hiện các mẫu trong dữ liệu và cải thiện hiệu suất khi có thêm dữ liệu mới."
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "2.2",
+                                    "subsection_title": "Nguồn dữ liệu",
+                                    "content_blocks": [
+                                        "Dữ liệu phục vụ cho học máy có thể đến từ nhiều nguồn:",
+                                        "* Cảm biến",
+                                        "* Website và mạng xã hội",
+                                        "* Hệ thống giao dịch",
+                                        "* Cơ sở dữ liệu nội bộ",
+                                        "Chất lượng dữ liệu có ảnh hưởng trực tiếp đến hiệu quả của mô hình học máy."
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "3",
+                            "section_title": "Các loại học máy",
+                            "subsections": [
+                                {
+                                    "subsection_number": "3.1",
+                                    "subsection_title": "Học có giám sát",
+                                    "content_blocks": [
+                                        "Học có giám sát là phương pháp trong đó mô hình được huấn luyện bằng dữ liệu đã được gán nhãn.",
+                                        "Hai dạng bài toán phổ biến:",
+                                        "* Phân loại (Classification)",
+                                        "* Hồi quy (Regression)",
+                                        "Ví dụ:",
+                                        "* Phân loại email spam",
+                                        "* Dự đoán giá nhà"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "3.2",
+                                    "subsection_title": "Học không giám sát",
+                                    "content_blocks": [
+                                        "Trong học không giám sát, dữ liệu không có nhãn. Thuật toán sẽ tìm kiếm cấu trúc tiềm ẩn trong dữ liệu.",
+                                        "Các nhiệm vụ phổ biến:",
+                                        "* Phân cụm dữ liệu",
+                                        "* Giảm chiều dữ liệu"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "3.3",
+                                    "subsection_title": "Học tăng cường",
+                                    "content_blocks": [
+                                        "Học tăng cường là phương pháp trong đó một tác nhân tương tác với môi trường và nhận phần thưởng để học cách tối ưu hành động.",
+                                        "Ứng dụng phổ biến:",
+                                        "* Robot tự động",
+                                        "* Hệ thống điều khiển",
+                                        "* AI chơi game"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "4",
+                            "section_title": "Quy trình xây dựng hệ thống học máy",
+                            "subsections": [
+                                {
+                                    "subsection_number": "4.1",
+                                    "subsection_title": "Các bước cơ bản",
+                                    "content_blocks": [
+                                        "Một hệ thống học máy thường bao gồm các bước:",
+                                        "1. Thu thập dữ liệu",
+                                        "2. Tiền xử lý dữ liệu",
+                                        "3. Chia tập dữ liệu",
+                                        "4. Huấn luyện mô hình",
+                                        "5. Đánh giá mô hình",
+                                        "6. Triển khai hệ thống"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "4.2",
+                                    "subsection_title": "Chia tập dữ liệu",
+                                    "content_blocks": [
+                                        "Dữ liệu thường được chia thành:",
+                                        "* Training set",
+                                        "* Validation set",
+                                        "* Test set"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "5",
+                            "section_title": "Ứng dụng của học máy",
+                            "subsections": [
+                                {
+                                    "subsection_number": "5.1",
+                                    "subsection_title": "Thương mại điện tử",
+                                    "content_blocks": [
+                                        "* Hệ thống gợi ý sản phẩm",
+                                        "* Cá nhân hóa nội dung"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "5.2",
+                                    "subsection_title": "Tài chính",
+                                    "content_blocks": [
+                                        "* Phát hiện gian lận",
+                                        "* Dự đoán rủi ro tín dụng"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "5.3",
+                                    "subsection_title": "Y tế",
+                                    "content_blocks": [
+                                        "* Chẩn đoán bệnh từ hình ảnh",
+                                        "* Phân tích dữ liệu bệnh án"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "lesson_number": "2",
+                    "title": "Giới thiệu về Deep Learning",
+                    "keywords": null,
+                    "section": [
+                        {
+                            "section_number": "1",
+                            "section_title": "Khái niệm Deep Learning",
+                            "subsections": [
+                                {
+                                    "subsection_number": "1.1",
+                                    "subsection_title": "Định nghĩa",
+                                    "content_blocks": [
+                                        "Deep Learning là một lĩnh vực con của Machine Learning tập trung vào việc sử dụng các mô hình mạng nơ-ron nhiều tầng (deep neural networks) để học các biểu diễn phức tạp của dữ liệu.",
+                                        "Khác với các thuật toán học máy truyền thống, Deep Learning có khả năng tự động học đặc trưng (feature learning) trực tiếp từ dữ liệu thô mà không cần thiết kế đặc trưng thủ công.",
+                                        "Các mô hình Deep Learning thường được xây dựng từ nhiều lớp nơ-ron xếp chồng lên nhau, cho phép hệ thống học các cấu trúc dữ liệu ở nhiều mức độ trừu tượng khác nhau."
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "1.2",
+                                    "subsection_title": "Ví dụ minh họa",
+                                    "content_blocks": [
+                                        "Một số ứng dụng phổ biến của Deep Learning gồm:",
+                                        "* Nhận dạng hình ảnh",
+                                        "* Nhận dạng giọng nói",
+                                        "* Dịch máy",
+                                        "* Hệ thống xe tự lái",
+                                        "Ví dụ, trong bài toán nhận diện khuôn mặt, một mạng Deep Learning có thể học cách phát hiện các đặc trưng như cạnh, hình dạng và cấu trúc khuôn mặt từ dữ liệu hình ảnh."
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "2",
+                            "section_title": "Sự khác biệt giữa Machine Learning và Deep Learning",
+                            "subsections": [
+                                {
+                                    "subsection_number": "2.1",
+                                    "subsection_title": "Đặc trưng dữ liệu",
+                                    "content_blocks": [
+                                        "Trong Machine Learning truyền thống, việc thiết kế đặc trưng (feature engineering) thường do con người thực hiện.",
+                                        "Ngược lại, Deep Learning có khả năng tự động học các đặc trưng quan trọng từ dữ liệu thông qua nhiều tầng mạng nơ-ron."
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "2.2",
+                                    "subsection_title": "Khả năng xử lý dữ liệu lớn",
+                                    "content_blocks": [
+                                        "Deep Learning hoạt động hiệu quả hơn khi có lượng dữ liệu lớn và tài nguyên tính toán mạnh như GPU.",
+                                        "Các mô hình Deep Learning có thể xử lý các dạng dữ liệu phức tạp như:",
+                                        "* Hình ảnh",
+                                        "* Âm thanh",
+                                        "* Văn bản",
+                                        "* Video"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "3",
+                            "section_title": "Mạng nơ-ron nhân tạo",
+                            "subsections": [
+                                {
+                                    "subsection_number": "3.1",
+                                    "subsection_title": "Cấu trúc cơ bản",
+                                    "content_blocks": [
+                                        "Mạng nơ-ron nhân tạo (Artificial Neural Network) được lấy cảm hứng từ cấu trúc của hệ thần kinh sinh học.",
+                                        "Một mạng nơ-ron thường gồm ba thành phần chính:",
+                                        "* Lớp đầu vào (Input Layer)",
+                                        "* Lớp ẩn (Hidden Layer)",
+                                        "* Lớp đầu ra (Output Layer)",
+                                        "Mỗi nơ-ron trong mạng nhận dữ liệu đầu vào, thực hiện phép tính trọng số và truyền kết quả qua một hàm kích hoạt."
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "3.2",
+                                    "subsection_title": "Hàm kích hoạt",
+                                    "content_blocks": [
+                                        "Hàm kích hoạt giúp mô hình học được các quan hệ phi tuyến giữa các biến.",
+                                        "Một số hàm kích hoạt phổ biến gồm:",
+                                        "* Sigmoid",
+                                        "* Tanh",
+                                        "* ReLU",
+                                        "Hàm ReLU hiện được sử dụng rộng rãi trong các mô hình Deep Learning hiện đại vì khả năng huấn luyện nhanh và hiệu quả."
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "4",
+                            "section_title": "Các kiến trúc Deep Learning phổ biến",
+                            "subsections": [
+                                {
+                                    "subsection_number": "4.1",
+                                    "subsection_title": "Convolutional Neural Network",
+                                    "content_blocks": [
+                                        "Convolutional Neural Network (CNN) là loại mạng nơ-ron được thiết kế để xử lý dữ liệu dạng lưới như hình ảnh.",
+                                        "CNN sử dụng các lớp tích chập (convolution) để trích xuất đặc trưng không gian từ ảnh.",
+                                        "Ứng dụng phổ biến:",
+                                        "* Nhận dạng hình ảnh",
+                                        "* Phát hiện đối tượng",
+                                        "* Phân loại ảnh"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "4.2",
+                                    "subsection_title": "Recurrent Neural Network",
+                                    "content_blocks": [
+                                        "Recurrent Neural Network (RNN) được thiết kế để xử lý dữ liệu dạng chuỗi.",
+                                        "RNN có khả năng ghi nhớ thông tin từ các bước trước đó trong chuỗi dữ liệu.",
+                                        "Ứng dụng phổ biến:",
+                                        "* Dịch máy",
+                                        "* Nhận dạng giọng nói",
+                                        "* Phân tích chuỗi thời gian"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "5",
+                            "section_title": "Yêu cầu tính toán của Deep Learning",
+                            "subsections": [
+                                {
+                                    "subsection_number": "5.1",
+                                    "subsection_title": "Dữ liệu",
+                                    "content_blocks": [
+                                        "Deep Learning thường yêu cầu tập dữ liệu lớn để đạt hiệu suất tốt. Các tập dữ liệu phổ biến có thể chứa hàng triệu mẫu dữ liệu."
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "5.2",
+                                    "subsection_title": "Phần cứng",
+                                    "content_blocks": [
+                                        "Việc huấn luyện các mô hình Deep Learning thường cần:",
+                                        "* GPU",
+                                        "* TPU",
+                                        "* Hệ thống tính toán phân tán",
+                                        "Những phần cứng này giúp tăng tốc quá trình huấn luyện mô hình và xử lý khối lượng dữ liệu lớn."
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "section_number": "6",
+                            "section_title": "Ứng dụng của Deep Learning",
+                            "subsections": [
+                                {
+                                    "subsection_number": "6.1",
+                                    "subsection_title": "Thị giác máy tính",
+                                    "content_blocks": [
+                                        "Deep Learning được sử dụng rộng rãi trong thị giác máy tính để:",
+                                        "* Nhận dạng khuôn mặt",
+                                        "* Phân loại ảnh",
+                                        "* Phát hiện vật thể"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "6.2",
+                                    "subsection_title": "Xử lý ngôn ngữ tự nhiên",
+                                    "content_blocks": [
+                                        "Trong lĩnh vực xử lý ngôn ngữ tự nhiên, Deep Learning được ứng dụng để:",
+                                        "* Dịch tự động",
+                                        "* Tóm tắt văn bản",
+                                        "* Chatbot"
+                                    ]
+                                },
+                                {
+                                    "subsection_number": "6.3",
+                                    "subsection_title": "Xe tự lái",
+                                    "content_blocks": [
+                                        "Các hệ thống xe tự lái sử dụng Deep Learning để:",
+                                        "* Nhận diện biển báo giao thông",
+                                        "* Phát hiện người đi bộ",
+                                        "* Điều khiển phương tiện"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
