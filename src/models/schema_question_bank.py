@@ -13,12 +13,9 @@ class Question(BaseModel):
     answers: list[Answer]
     explanation: str
     vector: list[float] # Vector embedding
-    difficulty_level: str
-
-class Topic(BaseModel):
-    topic_name: str
-    questions: list[Question]
+    difficulty_level: str # Mức độ khó: '1' (dễ), '2' (trung bình), '3' (khó)
+    keywords: Optional[list[str]] = None
 
 class QuestionBank(BaseModel):
     bank_name: str
-    topics: list[Topic]
+    questions: list[Question]

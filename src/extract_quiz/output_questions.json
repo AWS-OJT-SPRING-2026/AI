@@ -1,0 +1,288 @@
+{
+    "bank_name": "Toán Học: Đạo Hàm và Ứng Dụng",
+    "questions": [
+        {
+            "question_text": "Đạo hàm của hàm số $f(x)$ tại điểm $x_0$ được định nghĩa là:",
+            "image_url": null,
+            "difficulty_level": "1",
+            "keywords": [
+                "đạo hàm",
+                "định nghĩa đạo hàm"
+            ],
+            "explanation": "Theo định nghĩa, đạo hàm là giới hạn của tỉ số $\\frac{\\Delta f}{\\Delta x}$ khi $\\Delta x \\to 0$.",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "$f'(x_0) = \\lim_{\\Delta x \\to 0} \\frac{f(x_0 + \\Delta x) + f(x_0)}{\\Delta x}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "B",
+                    "content": "$f'(x_0) = \\lim_{\\Delta x \\to 0} \\frac{f(x_0 + \\Delta x) - f(x_0)}{\\Delta x}$",
+                    "is_correct": true
+                },
+                {
+                    "label": "C",
+                    "content": "$f'(x_0) = \\lim_{\\Delta x \\to \\infty} \\frac{f(x_0 + \\Delta x) - f(x_0)}{\\Delta x}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "D",
+                    "content": "$f'(x_0) = f(x_0 + 1) - f(x_0)$",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "Đạo hàm của hàm số $f(x) = x^n$ ($n \\in \\mathbb{R}$) là:",
+            "image_url": null,
+            "difficulty_level": "2",
+            "keywords": [
+                "đạo hàm",
+                "hàm lũy thừa"
+            ],
+            "explanation": "Công thức đạo hàm lũy thừa: $(x^n)' = nx^{n-1}$.",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "$f'(x) = x^{n-1}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "B",
+                    "content": "$f'(x) = nx^{n+1}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "C",
+                    "content": "$f'(x) = nx^{n-1}$",
+                    "is_correct": true
+                },
+                {
+                    "label": "D",
+                    "content": "$f'(x) = (n - 1)x^n$",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "Tính đạo hàm của $f(x) = x^3 \\sin x$.",
+            "image_url": null,
+            "difficulty_level": "2",
+            "keywords": [
+                "đạo hàm",
+                "quy tắc tích",
+                "hàm hợp"
+            ],
+            "explanation": "Áp dụng quy tắc tích $(uv)' = u'v + uv'$ với $u = x^3$, $v = \\sin x$: $$f'(x) = (x^3)' \\cdot \\sin x + x^3 \\cdot (\\sin x)' = 3x^2 \\sin x + x^3 \\cos x$$",
+            "answers": []
+        },
+        {
+            "question_text": "Cho $u(x)$ và $v(x)$ khả vi. Công thức đạo hàm thương $\\left( \\frac{u}{v} \\right)'$ là:",
+            "image_url": null,
+            "difficulty_level": "2",
+            "keywords": [
+                "đạo hàm",
+                "quy tắc thương"
+            ],
+            "explanation": "Quy tắc thương: $\\left( \\frac{u}{v} \\right)' = \\frac{u'v - uv'}{v^2}$, với $v \\neq 0$.",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "$\\frac{u'v + uv'}{v^2}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "B",
+                    "content": "$\\frac{u'v - uv'}{v^2}$",
+                    "is_correct": true
+                },
+                {
+                    "label": "C",
+                    "content": "$\\frac{u'v - uv'}{v}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "D",
+                    "content": "$u'v - uv'$",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "Tính đạo hàm của $f(x) = \\ln(\\sin x)$.",
+            "image_url": null,
+            "difficulty_level": "3",
+            "keywords": [
+                "đạo hàm",
+                "hàm hợp",
+                "logarit"
+            ],
+            "explanation": "Áp dụng quy tắc hàm hợp $[f(g(x))]' = f'(g(x)) \\cdot g'(x)$:\n\n$$[\\ln(\\sin x)]' = \\frac{1}{\\sin x} \\cdot \\cos x = \\frac{\\cos x}{\\sin x} = \\cot x$$",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "$\\frac{1}{\\sin x}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "B",
+                    "content": "$\\cos x \\cdot \\ln(\\sin x)$",
+                    "is_correct": false
+                },
+                {
+                    "label": "C",
+                    "content": "$\\frac{\\cos x}{\\sin x}$",
+                    "is_correct": true
+                },
+                {
+                    "label": "D",
+                    "content": "$-\\frac{\\cos x}{\\sin x}$",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "Hàm số $f(x) = x^3 - 3x^2 - 9x + 5$ đạt cực đại tại:",
+            "image_url": null,
+            "difficulty_level": "3",
+            "keywords": [
+                "ứng dụng đạo hàm",
+                "cực trị",
+                "tìm cực đại"
+            ],
+            "explanation": "$f'(x) = 3x^2 - 6x - 9 = 3(x - 3)(x + 1) = 0 \\Rightarrow x = 3$ hoặc $x = -1$.\\nXét dấu: $f'(x)$ đổi dấu từ $+$ sang $-$ tại $x = -1 \\Rightarrow$ cực đại tại $x = -1$.",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "$x = 3$",
+                    "is_correct": false
+                },
+                {
+                    "label": "B",
+                    "content": "$x = -1$",
+                    "is_correct": true
+                },
+                {
+                    "label": "C",
+                    "content": "$x = 1$",
+                    "is_correct": false
+                },
+                {
+                    "label": "D",
+                    "content": "$x = -3$",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "$F(x)$ là nguyên hàm của $f(x)$ trên khoảng $I$ khi và chỉ khi:",
+            "image_url": null,
+            "difficulty_level": "1",
+            "keywords": [
+                "nguyên hàm",
+                "tích phân bất định",
+                "định nghĩa"
+            ],
+            "explanation": "Theo định nghĩa, $F(x)$ là nguyên hàm của $f(x)$ khi $F'(x) = f(x)$.",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "$F(x) = f'(x)$ với mọi $x \\in I$",
+                    "is_correct": false
+                },
+                {
+                    "label": "B",
+                    "content": "$F'(x) = f(x)$ với mọi $x \\in I$",
+                    "is_correct": true
+                },
+                {
+                    "label": "C",
+                    "content": "$F(x) = \\int f'(x) \\, dx$",
+                    "is_correct": false
+                },
+                {
+                    "label": "D",
+                    "content": "$f'(x) = F(x) + C$",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "$\\int e^x \\, dx = ?$",
+            "image_url": null,
+            "difficulty_level": "2",
+            "keywords": [
+                "nguyên hàm",
+                "tích phân bất định",
+                "hàm mũ"
+            ],
+            "explanation": "Hàm $e^x$ có nguyên hàm là chính nó: $\\int e^x \\, dx = e^x + C$.",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "$e^x + C$",
+                    "is_correct": true
+                },
+                {
+                    "label": "B",
+                    "content": "$e^{x+1} + C$",
+                    "is_correct": false
+                },
+                {
+                    "label": "C",
+                    "content": "$xe^x + C$",
+                    "is_correct": false
+                },
+                {
+                    "label": "D",
+                    "content": "$\\frac{e^x}{x} + C$",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "Tính $\\int_{0}^{1} x^2 \\, dx$.",
+            "image_url": null,
+            "difficulty_level": "2",
+            "keywords": [
+                "tích phân xác định",
+                "tính tích phân"
+            ],
+            "explanation": "$$\\int_{0}^{1} x^2 \\, dx = \\left[ \\frac{x^3}{3} \\right]_0^1 = \\frac{1}{3} - 0 = \\frac{1}{3}$$",
+            "answers": [
+                {
+                    "label": "A",
+                    "content": "1",
+                    "is_correct": false
+                },
+                {
+                    "label": "B",
+                    "content": "$\\frac{1}{2}$",
+                    "is_correct": false
+                },
+                {
+                    "label": "C",
+                    "content": "$\\frac{1}{3}$",
+                    "is_correct": true
+                },
+                {
+                    "label": "D",
+                    "content": "2",
+                    "is_correct": false
+                }
+            ]
+        },
+        {
+            "question_text": "Dùng tích phân xác định, tính diện tích hình phẳng giới hạn bởi $y = x^2$, trục hoành $Ox$, và các đường $x = 0$, $x = 2$.",
+            "image_url": null,
+            "difficulty_level": "3",
+            "keywords": [
+                "tích phân xác định",
+                "diện tích hình phẳng"
+            ],
+            "explanation": "Vì $f(x) = x^2 \\geq 0$ trên $[0, 2]$, diện tích là:\\n$$S = \\int_{0}^{2} x^2 \\, dx = \\left[ \\frac{x^3}{3} \\right]_{0}^{2} = \\frac{8}{3}$$\\n**Kết quả:** $S = \\frac{8}{3}$ (đơn vị diện tích).",
+            "answers": []
+        }
+    ]
+}

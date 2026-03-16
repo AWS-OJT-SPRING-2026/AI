@@ -3,7 +3,7 @@ import os
 import sys
 import psycopg2
 from datetime import datetime
-from app.models.schema import Book
+from src.models.schema import Book
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -50,9 +50,8 @@ else:
     print(f"Đã tạo môn học mới '{subject_name}' với subject_id = {subject_id}")
 
 # Load JSON
-with open("./app/extract_doc/output_doc.json", "r", encoding="utf-8") as f:
+with open("./src/extract_doc/output_doc.json", "r", encoding="utf-8") as f:
     data = json.load(f)
-
 # Validate bằng Pydantic
 book = Book.model_validate(data)
 
@@ -91,6 +90,28 @@ for chapter in book.chapters:
         )
 
         lesson_id = cur.fetchone()[0]
+
+        # Insert keywords for the lesson
+        if lesson.keywords:
+            for kw in lesson.keywords:
+                kw_clean = kw.strip()
+                if not kw_clean:
+                    continue
+                
+                # Check if keyword exists
+                cur.execute("SELECT id FROM keywords WHERE keyword = %s", (kw_clean,))
+                kw_row = cur.fetchone()
+                if kw_row:
+                    keyword_id = kw_row[0]
+                else:
+                    cur.execute("INSERT INTO keywords (keyword) VALUES (%s) RETURNING id", (kw_clean,))
+                    keyword_id = cur.fetchone()[0]
+                
+                # Link to lesson
+                cur.execute(
+                    "INSERT INTO lessons_link (lesson_id, keyword_id) VALUES (%s, %s)",
+                    (lesson_id, keyword_id)
+                )
 
         # Insert sections
         for section in lesson.section:

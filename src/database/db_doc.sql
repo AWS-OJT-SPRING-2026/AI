@@ -18,6 +18,12 @@ CREATE TABLE lessons (
     title TEXT
 );
 
+CREATE TABLE lessons_link (
+    id SERIAL PRIMARY KEY,
+    lesson_id INT REFERENCES lessons(id) ON DELETE CASCADE,
+    keyword_id INT REFERENCES keywords(id) ON DELETE CASCADE
+);
+
 CREATE TABLE sections (
     id SERIAL PRIMARY KEY,
     lesson_id INT REFERENCES lessons(id) ON DELETE CASCADE,

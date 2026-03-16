@@ -11,28 +11,17 @@ extractor = LlamaExtract(api_key=os.getenv("LLAMA_CLOUD_API_KEY"))
 json_data = {
     "dataSchema": {
         "type": "object",
-        "required": ["bank_name", "topics"],
+        "required": ["bank_name", "questions"],
         "properties": {
             "bank_name": {
                 "type": "string",
                 "description": "Tên ngân hàng câu hỏi"
             },
-            "topics": {
+            "questions": {
                 "type": "array",
-                "description": "Danh sách các chủ đề trong ngân hàng câu hỏi",
+                "description": "Danh sách câu hỏi",
                 "items": {
                     "type": "object",
-                    "required": ["topic_name", "questions"],
-                    "properties": {
-                        "topic_name": {
-                            "type": "string",
-                            "description": "Tên chủ đề"
-                        },
-                        "questions": {
-                            "type": "array",
-                            "description": "Danh sách câu hỏi",
-                            "items": {
-                                "type": "object",
                                 "required": [
                                     "question_text",
                                     "difficulty_level",
@@ -49,7 +38,19 @@ json_data = {
                                     },
                                     "difficulty_level": {
                                         "type": "string",
-                                        "description": "Mức độ câu hỏi: dễ, trung bình, khó"
+                                        "description": "Mức độ câu hỏi, chỉ được điền: '1' (dễ), '2' (trung bình), hoặc '3' (khó)"
+                                    },
+                                    "keywords": {
+                                        "anyOf": [{
+                                            "description": "Danh sách các từ khóa, khái niệm hoặc chủ đề mà câu hỏi này đang kiểm tra.",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        }, {
+                                            "type": "null"
+                                        }],
+                                        "description": "Danh sách các từ khóa, thuật ngữ hoặc chủ đề câu hỏi đề cập."
                                     },
                                     "explanation": {
                                         "type": ["string", "null"],
@@ -83,9 +84,6 @@ json_data = {
                                     }
                                 }
                             }
-                        }
-                    }
-                }
             }
         }
     },
@@ -99,30 +97,28 @@ Bạn là hệ thống trích xuất ngân hàng câu hỏi.
 Chuyển tài liệu thành JSON theo cấu trúc:
 
 Question Bank
- → Topic
-   → Question
-     → Answers
+  → Question
+    → Answers
 
 Quy tắc:
 
 1. Trích xuất tên ngân hàng câu hỏi vào `bank_name`.
 
-2. Nhóm câu hỏi theo chủ đề `topic_name`.
-
-3. Với mỗi câu hỏi:
+2. Với mỗi câu hỏi:
    - `question_text`: nội dung câu hỏi
-   - `difficulty_level`: dễ/trung bình/ khó
+   - `difficulty_level`: bắt buộc là '1' (nếu dễ), '2' (trung bình) hoặc '3' (khó)
    - `explanation`: lời giải nếu có
    - `image_url`: nếu câu hỏi có hình
+   - `keywords`: mảng các từ khóa, khái niệm mà câu hỏi đang đề cập đến
 
-4. Với câu trắc nghiệm:
+3. Với câu trắc nghiệm:
    - Tách từng đáp án A,B,C,D
    - Gán label tương ứng
    - Đánh dấu đáp án đúng `is_correct=true`
 
-5. Không tự tạo dữ liệu. Nếu không có thì trả null.
+4. Không tự tạo dữ liệu. Nếu không có thì trả null.
 
-6. Đảm bảo JSON hợp lệ theo schema.
+5. Đảm bảo JSON hợp lệ theo schema.
 """,
         "chunk_mode": "SECTION"
     }
@@ -131,12 +127,12 @@ Quy tắc:
 data_schema = json_data["dataSchema"]
 config = ExtractConfig(**json_data["config"])
 
-file = "app/extract_quiz/quiz_template.pdf"
+file = "./src/extract_quiz/quiz_template.pdf"
 
 try:
     result = extractor.extract(data_schema, config, file)
 
-    output_path = "app/extract_quiz/output_questions.json"
+    output_path = "./src/extract_quiz/output_questions.json"
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(result.data, f, ensure_ascii=False, indent=4)

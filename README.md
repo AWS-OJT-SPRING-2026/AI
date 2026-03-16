@@ -1,11 +1,6 @@
-## Công việc tiếp theo
+## Công việc cần làm:
+* Sửa lại các file: extract_doc.py, extract_questions.py mục đích để có thể extract được keyword của từng lesson lưu vào database.
+* Sửa lại logic các file insert_db để phù hợp với output của các file extract_doc.py, extract_questions.py (các câu hỏi được insert vào database có mức độ khó 1, 2, 3 tương ứng với số câu hỏi ở mức độ khó tăng dần)
+* Sửa lại file quiz_generator.py để có thể tạo ra quiz dựa trên nội dung của từng lesson, tham số là chapter id, lesson id, số lượng câu hỏi, số câu hỏi ở mức độ khó 1, 2, 3 (tương ứng với số câu hỏi ở mức độ khó tăng dần)
 
-* Tạo câu hỏi dựa trên database
-* Chuyển về dạng FastAPI
-* Tạo đề theo nguyên tắc ví dụ 40 câu thì cần 50% dễ 40% TB 10% khó
-
-## Những hạn chế chưa xử lý
-
-* Chưa xử lý được duplicate data
-* Định hướng muốn làm là khi insert\_db sẽ embed luôn vector vào database. Nhưng hiện tại chưa làm.
-* Chưa Set Index cho vector embedding khiến query vector tốn thời gian
+## các câu hỏi đang có keyword khác với lesson

@@ -4,13 +4,6 @@ CREATE TABLE question_bank (
     subject_id INT REFERENCES subjects(subject_id) ON DELETE CASCADE
 );
 
-CREATE TABLE topics (
-    id SERIAL PRIMARY KEY,
-    topic_name TEXT NOT NULL,
-    bank_id INT NOT NULL,
-    FOREIGN KEY (bank_id) REFERENCES question_bank(id)
-);
-
 CREATE TABLE questions (
     id SERIAL PRIMARY KEY,
     question_text TEXT NOT NULL,
@@ -18,9 +11,15 @@ CREATE TABLE questions (
     explanation TEXT,
     difficulty_level TEXT NOT NULL,
     embedding vector(3072),
-    topic_id INT NOT NULL,
     is_ai BOOLEAN NOT NULL DEFAULT FALSE,
-    FOREIGN KEY (topic_id) REFERENCES topics(id)
+    bank_id INT REFERENCES question_bank(id) ON DELETE CASCADE
+);
+
+CREATE TABLE questions_link (
+    id SERIAL PRIMARY KEY,
+    question_id INT REFERENCES questions(id) ON DELETE CASCADE,
+    lesson_id INT REFERENCES lessons(id) ON DELETE CASCADE,
+    keyword_id INT REFERENCES keywords(id) ON DELETE CASCADE
 );
 
 CREATE TABLE answers (
@@ -38,15 +37,11 @@ CREATE TABLE answers (
 -- question_bank
 CREATE INDEX idx_question_bank_bank_name ON question_bank(bank_name);
  
--- topic
-CREATE INDEX idx_topic_bank_id ON topic(bank_id);
-CREATE INDEX idx_topic_topic_name ON topic(topic_name);
- 
 -- question
-CREATE INDEX idx_question_topic_id ON question(topic_id);
-CREATE INDEX idx_question_difficulty_level ON question(difficulty_level);
-CREATE INDEX idx_question_embedding ON question USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX idx_question_bank_id ON questions(bank_id);
+CREATE INDEX idx_question_difficulty_level ON questions(difficulty_level);
+CREATE INDEX idx_question_embedding ON questions USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
  
 -- answer
-CREATE INDEX idx_answer_question_id ON answer(question_id);
+CREATE INDEX idx_answer_question_id ON answers(question_id);
 CREATE INDEX idx_answer_is_correct ON answer(is_correct);

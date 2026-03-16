@@ -13,7 +13,8 @@ load_dotenv()
 PROMPT_TEMPLATE = """Bạn là một chuyên gia giáo dục. Hãy tạo bài trắc nghiệm dựa trên đoạn văn bản được cung cấp.
 
 Yêu cầu sinh câu hỏi:
-- Tạo từ {num_questions} câu hỏi trắc nghiệm liên quan đến nội dung văn bản.
+- Tổng số lượng câu hỏi cần tạo: {num_questions} câu, trong đó bao gồm: {num_q1} câu độ khó 1 (dễ), {num_q2} câu độ khó 2 (trung bình), và {num_q3} câu độ khó 3 (khó).
+- Đảm bảo tạo đúng và đủ số lượng theo từng mức độ khó yêu cầu.
 - Mỗi câu hỏi có đúng 4 đáp án (A, B, C, D).
 - Chỉ có đúng 1 đáp án đúng cho mỗi câu.
 - Kèm theo giải thích chi tiết cho đáp án đúng.
@@ -24,7 +25,7 @@ Yêu cầu sinh câu hỏi:
 Format kết quả BẮT BUỘC trả về dưới dạng JSON chính xác như sau:
 {{
   "quiz_id": "quiz_001",
-  "topic": "Chủ đề chính của đoạn văn",
+  "bank_name": "Chủ đề chính của đoạn văn",
   "questions": [
     {{
       "question_id": 1,
@@ -36,7 +37,8 @@ Format kết quả BẮT BUỘC trả về dưới dạng JSON chính xác như 
         "D": "Đáp án D"
       }},
       "correct_answer": "A",
-      "explanation": "Giải thích vì sao đáp án lại đúng."
+      "explanation": "Giải thích vì sao đáp án lại đúng.",
+      "difficulty_level": "1" // Chỉ được phép: "1", "2", hoặc "3" tương ứng dễ, trung bình, khó
     }}
   ]
 }}
@@ -160,6 +162,38 @@ def fetch_content_by_chapter(chapter_id: int) -> List[Dict[str, Any]]:
             (chapter_id,)
         )
         return _parse_content_rows(cur.fetchall())
+    finally:
+        cur.close()
+        conn.close()
+
+
+def fetch_content_by_lesson(lesson_id: int) -> List[Dict[str, Any]]:
+    """
+    Truy xuất tất cả content_blocks của một bài học (lesson_id).
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            _CONTENT_SELECT + """
+            WHERE l.id = %s
+            ORDER BY s.section_number, sub.subsection_number, cb.id
+            """,
+            (lesson_id,)
+        )
+        return _parse_content_rows(cur.fetchall())
+    finally:
+        cur.close()
+        conn.close()
+
+def _get_keywords_for_lesson(lesson_id: int) -> List[int]:
+    """Lấy danh sách keyword_ids được link với lesson_id."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT keyword_id FROM lessons_link WHERE lesson_id = %s", (lesson_id,))
+        rows = cur.fetchall()
+        return [row[0] for row in rows]
     finally:
         cur.close()
         conn.close()
@@ -321,7 +355,7 @@ class QuizGeneratorService:
         """
         Hàm validate schema cơ bản để đảm bảo output đúng cấu trúc yêu cầu.
         """
-        if "quiz_id" not in quiz_data or "topic" not in quiz_data or "questions" not in quiz_data:
+        if "quiz_id" not in quiz_data or "bank_name" not in quiz_data or "questions" not in quiz_data:
             return False
             
         questions = quiz_data.get("questions", [])
@@ -339,15 +373,20 @@ class QuizGeneratorService:
                 
         return True
 
-    def generate(self, text: str, num_questions: int = 5, existing_questions: List[str] = None, retries: int = 1) -> dict:
+    def generate(self, text: str, num_q1: int = 2, num_q2: int = 2, num_q3: int = 1, existing_questions: List[str] = None, retries: int = 1) -> dict:
         """
-        Gửi request đến OpenAI để sinh câu hỏi.
-        Nếu JSON bị lỗi format, hệ thống sẽ retry theo số lần chỉ định (mặc định 1 lần).
-        existing_questions: danh sách câu hỏi đã tạo trước đó cần tránh.
+        Gửi request đến OpenAI để sinh câu hỏi theo mức độ khó.
         """
+        num_questions = num_q1 + num_q2 + num_q3
+        if num_questions <= 0:
+            raise ValueError("Tổng số lượng câu hỏi phải lớn hơn 0.")
+            
         existing_section = _build_existing_questions_section(existing_questions or [])
         prompt = PROMPT_TEMPLATE.format(
             num_questions=num_questions,
+            num_q1=num_q1,
+            num_q2=num_q2,
+            num_q3=num_q3,
             text=text,
             existing_questions_section=existing_section
         )
@@ -395,24 +434,24 @@ class QuizGeneratorService:
 # ==========================================
 # 5. Hàm giao tiếp chính (Main Wrapper)
 # ==========================================
-def generate_quiz(text: str, num_questions: int = 5, existing_questions: List[str] = None) -> dict:
+def generate_quiz(text: str, num_q1: int = 2, num_q2: int = 2, num_q3: int = 1, existing_questions: List[str] = None) -> dict:
     """
     Hàm giao tiếp (wrapper) dùng để tích hợp một cách nhanh chóng.
-    Nhận vào `text`, số lượng câu hỏi, và danh sách câu hỏi cần tránh.
+    Nhận vào `text`, số lượng câu hỏi từng độ khó, và danh sách câu hỏi cần tránh.
     """
     service = QuizGeneratorService()
-    return service.generate(text=text, num_questions=num_questions, existing_questions=existing_questions)
+    return service.generate(text=text, num_q1=num_q1, num_q2=num_q2, num_q3=num_q3, existing_questions=existing_questions)
 
 
 # ==========================================
 # 6. Lưu câu hỏi AI vào Database
 # ==========================================
-def save_quiz_to_db(quiz_data: dict, topic_id: int) -> List[int]:
+def save_quiz_to_db(quiz_data: dict, bank_id: int, lesson_id: int = None, keyword_ids: List[int] = None) -> List[int]:
     """
     Lưu bộ câu hỏi được AI tạo ra vào database.
     - Mỗi question được insert vào bảng `questions` với is_ai = TRUE.
     - Mỗi answer (A, B, C, D) được insert vào bảng `answers`.
-    - Embedding được tạo cho mỗi question_text bằng OpenAI.
+    - Tạo link question <-> lesson, keywords vào bảng `questions_link`.
     
     Trả về danh sách question IDs đã được insert.
     """
@@ -430,6 +469,11 @@ def save_quiz_to_db(quiz_data: dict, topic_id: int) -> List[int]:
             explanation = q.get("explanation", "")
             correct_answer = q["correct_answer"]
             options = q["options"]
+            
+            # Xử lý difficulty level
+            difficulty = str(q.get("difficulty_level", "2")).strip()
+            if difficulty not in ["1", "2", "3"]:
+                difficulty = "2"
 
             # Sinh embedding cho câu hỏi
             response = client.embeddings.create(
@@ -442,7 +486,7 @@ def save_quiz_to_db(quiz_data: dict, topic_id: int) -> List[int]:
             cur.execute(
                 """
                 INSERT INTO questions 
-                    (question_text, image_url, explanation, difficulty_level, embedding, topic_id, is_ai)
+                    (question_text, image_url, explanation, difficulty_level, embedding, bank_id, is_ai)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
@@ -450,14 +494,29 @@ def save_quiz_to_db(quiz_data: dict, topic_id: int) -> List[int]:
                     question_text,
                     None,           # image_url: AI không tạo hình ảnh
                     explanation,
-                    "medium",       # difficulty_level mặc định
+                    difficulty,
                     embedding,
-                    topic_id,
+                    bank_id,
                     True            # is_ai = TRUE theo yêu cầu README
                 )
             )
             question_id = cur.fetchone()[0]
             inserted_question_ids.append(question_id)
+
+            # Insert questions_link
+            if lesson_id or keyword_ids:
+                if keyword_ids:
+                    for kid in keyword_ids:
+                        cur.execute(
+                            "INSERT INTO questions_link (question_id, lesson_id, keyword_id) VALUES (%s, %s, %s)",
+                            (question_id, lesson_id, kid)
+                        )
+                elif lesson_id:
+                     # Chỉ có lesson_id, không có keyword_id
+                     cur.execute(
+                         "INSERT INTO questions_link (question_id, lesson_id, keyword_id) VALUES (%s, %s, NULL)",
+                         (question_id, lesson_id)
+                     )
 
             # Insert đáp án vào bảng answers
             for label in ["A", "B", "C", "D"]:
@@ -485,51 +544,41 @@ def save_quiz_to_db(quiz_data: dict, topic_id: int) -> List[int]:
 
 
 # ==========================================
-# 7. Tự động tạo Topic nếu chưa có
+# 7. Tự động tìm hoặc tạo Question Bank
 # ==========================================
-def get_or_create_topic(topic_name: str, bank_id: int = None, subject_id: int = None) -> int:
+def get_or_create_bank(bank_name: str, subject_id: int = None) -> int:
     """
-    Tìm topic theo tên, nếu chưa có thì tự động tạo mới.
-    Nếu bank_id không được cung cấp, sẽ tự tạo một question_bank mới (kèm subject_id nếu có).
+    Tìm question_bank theo tên, nếu chưa có thì tự động tạo mới.
     
     Returns:
-        topic_id đã tồn tại hoặc mới tạo.
+        bank_id đã tồn tại hoặc mới tạo.
     """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Kiểm tra topic đã tồn tại chưa
+        # Kiểm tra question_bank đã tồn tại chưa
         cur.execute(
-            "SELECT id FROM topics WHERE topic_name = %s",
-            (topic_name,)
+            "SELECT id FROM question_bank WHERE bank_name = %s AND (subject_id = %s OR subject_id IS NULL)",
+            (bank_name, subject_id)
         )
         row = cur.fetchone()
         if row:
-            print(f"Đã tìm thấy topic '{topic_name}' với id = {row[0]}")
+            print(f"Đã tìm thấy question_bank '{bank_name}' với id = {row[0]}")
             return row[0]
 
-        # Nếu chưa có bank_id, tạo question_bank mới (kèm subject_id)
-        if not bank_id:
-            cur.execute(
-                "INSERT INTO question_bank (bank_name, subject_id) VALUES (%s, %s) RETURNING id",
-                (f"AI Generated - {topic_name}", subject_id)
-            )
-            bank_id = cur.fetchone()[0]
-            print(f"Đã tạo question_bank mới với id = {bank_id}")
-
-        # Tạo topic mới
+        # Tạo question_bank mới
         cur.execute(
-            "INSERT INTO topics (topic_name, bank_id) VALUES (%s, %s) RETURNING id",
-            (topic_name, bank_id)
+            "INSERT INTO question_bank (bank_name, subject_id) VALUES (%s, %s) RETURNING id",
+            (bank_name, subject_id)
         )
-        topic_id = cur.fetchone()[0]
+        bank_id = cur.fetchone()[0]
         conn.commit()
-        print(f"Đã tạo topic mới '{topic_name}' với id = {topic_id}")
-        return topic_id
+        print(f"Đã tạo question_bank mới '{bank_name}' với id = {bank_id}")
+        return bank_id
 
     except Exception as e:
         conn.rollback()
-        raise RuntimeError(f"Lỗi khi tạo topic: {e}")
+        raise RuntimeError(f"Lỗi khi tạo question_bank: {e}")
     finally:
         cur.close()
         conn.close()
@@ -539,37 +588,32 @@ def get_or_create_topic(topic_name: str, bank_id: int = None, subject_id: int = 
 # 8. Pipeline: Lấy lý thuyết → Sinh quiz → Lưu DB
 # ==========================================
 def generate_and_save_quiz(
-    topic_id: int = None,
+    bank_id: int = None,
     subject_id: int = None,
     book_id: int = None,
     chapter_id: int = None,
-    num_questions: int = 5
+    lesson_id: int = None,
+    num_q1: int = 2,
+    num_q2: int = 2,
+    num_q3: int = 1
 ) -> dict:
     """
     Pipeline hoàn chỉnh:
-    1. Truy xuất lý thuyết từ database (theo subject_id, book_id, hoặc chapter_id).
+    1. Truy xuất lý thuyết từ database theo thứ tự ưu tiên: lesson_id > chapter_id > book_id > subject_id.
     2. Sinh câu hỏi trắc nghiệm bằng OpenAI.
     3. Lưu câu hỏi vào database với is_ai = TRUE.
-    
-    Params:
-        topic_id: ID của topic (tùy chọn). Nếu không có, sẽ tự tạo topic mới.
-        subject_id: Lấy lý thuyết tổng hợp từ tất cả sách thuộc môn học.
-        book_id: Lấy lý thuyết theo cuốn sách.
-        chapter_id: Lấy lý thuyết theo chương.
-        num_questions: Số lượng câu hỏi muốn tạo (mặc định 5).
-    
-    Returns:
-        dict chứa quiz_data và danh sách question_ids đã lưu.
     """
     # Bước 1: Truy xuất lý thuyết từ database
-    if chapter_id:
+    if lesson_id:
+        content_blocks = fetch_content_by_lesson(lesson_id)
+    elif chapter_id:
         content_blocks = fetch_content_by_chapter(chapter_id)
     elif book_id:
         content_blocks = fetch_content_by_book(book_id)
     elif subject_id:
         content_blocks = fetch_content_by_subject(subject_id)
     else:
-        raise ValueError("Phải cung cấp ít nhất một trong: subject_id, book_id, hoặc chapter_id.")
+        raise ValueError("Phải cung cấp ít nhất một trong: subject_id, book_id, chapter_id, hoặc lesson_id.")
 
     if not content_blocks:
         raise ValueError("Không tìm thấy nội dung lý thuyết trong database với ID đã cho.")
@@ -584,6 +628,9 @@ def generate_and_save_quiz(
         resolved_subject_id = _get_subject_id_from_book(book_id)
     elif not resolved_subject_id and chapter_id:
         resolved_subject_id = _get_subject_id_from_chapter(chapter_id)
+    elif not resolved_subject_id and lesson_id:
+        # Tạm bỏ qua query resolve trực tiếp lesson->subject để tránh rối (nếu cần có thể viết thêm CTE)
+        pass 
 
     existing_questions = []
     if resolved_subject_id:
@@ -591,24 +638,31 @@ def generate_and_save_quiz(
         if existing_questions:
             print(f"Tìm thấy {len(existing_questions)} câu hỏi đã tạo trước đó cho môn này. Sẽ tránh trùng lặp.")
 
+    # Lấy keywords nếu search theo lesson
+    keyword_ids = []
+    if lesson_id:
+        keyword_ids = _get_keywords_for_lesson(lesson_id)
+
     # Bước 2: Sinh câu hỏi trắc nghiệm
     print("Đang tạo câu hỏi trắc nghiệm bằng OpenAI API...")
-    quiz_data = generate_quiz(text=theory_text, num_questions=num_questions, existing_questions=existing_questions)
+    quiz_data = generate_quiz(text=theory_text, num_q1=num_q1, num_q2=num_q2, num_q3=num_q3, existing_questions=existing_questions)
 
-    # Bước 3: Nếu chưa có topic_id, tự tạo topic từ tên chủ đề AI trả về
-    if not topic_id:
-        topic_name = quiz_data.get("topic", "AI Generated Quiz")
-        topic_id = get_or_create_topic(topic_name=topic_name, subject_id=resolved_subject_id)
+    # Bước 3: Nếu chưa có bank_id, lấy từ kết quả OpenAI hoặc tạo mới
+    if not bank_id:
+        bank_name = quiz_data.get("bank_name", "AI Generated Quiz")
+        bank_id = get_or_create_bank(bank_name=bank_name, subject_id=resolved_subject_id)
 
     # Bước 4: Lưu vào database
-    question_ids = save_quiz_to_db(quiz_data=quiz_data, topic_id=topic_id)
+    question_ids = save_quiz_to_db(quiz_data=quiz_data, bank_id=bank_id, lesson_id=lesson_id, keyword_ids=keyword_ids)
 
     return {
         "quiz_data": quiz_data,
         "inserted_question_ids": question_ids,
         "total_content_blocks": len(content_blocks),
-        "topic_id": topic_id,
-        "subject_id": resolved_subject_id
+        "bank_id": bank_id,
+        "subject_id": resolved_subject_id,
+        "lesson_id": lesson_id,
+        "keyword_ids": keyword_ids
     }
 
 
@@ -619,26 +673,34 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Quiz Generator - Tạo câu hỏi trắc nghiệm từ lý thuyết trong DB")
-    parser.add_argument("--topic-id", type=int, default=None, help="ID của topic (tùy chọn, nếu không có sẽ tự tạo mới)")
+    parser.add_argument("--bank-id", type=int, default=None, help="ID của question_bank (tùy chọn, nếu không có sẽ tự tạo mới)")
     parser.add_argument("--subject-id", type=int, default=None, help="ID môn học - lấy lý thuyết tổng hợp từ tất cả sách của môn")
     parser.add_argument("--book-id", type=int, default=None, help="ID cuốn sách để lấy lý thuyết")
     parser.add_argument("--chapter-id", type=int, default=None, help="ID chương để lấy lý thuyết")
-    parser.add_argument("--num-questions", type=int, default=5, help="Số lượng câu hỏi muốn tạo (mặc định 5)")
+    parser.add_argument("--lesson-id", type=int, default=None, help="ID bài học để lấy lý thuyết")
+    
+    parser.add_argument("--num-q1", type=int, default=2, help="Số lượng câu hỏi dễ (độ khó 1)")
+    parser.add_argument("--num-q2", type=int, default=2, help="Số lượng câu hỏi trung bình (độ khó 2)")
+    parser.add_argument("--num-q3", type=int, default=1, help="Số lượng câu hỏi khó (độ khó 3)")
 
     args = parser.parse_args()
 
     try:
         result = generate_and_save_quiz(
-            topic_id=args.topic_id,
+            bank_id=args.bank_id,
             subject_id=args.subject_id,
             book_id=args.book_id,
             chapter_id=args.chapter_id,
-            num_questions=args.num_questions,
+            lesson_id=args.lesson_id,
+            num_q1=args.num_q1,
+            num_q2=args.num_q2,
+            num_q3=args.num_q3,
         )
 
         print("\n=== Kết quả ===")
         print(f"Subject ID: {result['subject_id']}")
-        print(f"Topic ID: {result['topic_id']}")
+        print(f"Bank ID: {result['bank_id']}")
+        print(f"Lesson ID: {result.get('lesson_id')}")
         print(f"Số content blocks đã truy xuất: {result['total_content_blocks']}")
         print(f"Số câu hỏi đã lưu: {len(result['inserted_question_ids'])}")
         print(f"Question IDs: {result['inserted_question_ids']}")
