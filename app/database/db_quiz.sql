@@ -1,16 +1,17 @@
 CREATE TABLE question_bank (
     id SERIAL PRIMARY KEY,
-    bank_name TEXT NOT NULL
+    bank_name TEXT NOT NULL,
+    subject_id INT REFERENCES subjects(subject_id) ON DELETE CASCADE
 );
 
-CREATE TABLE topic (
+CREATE TABLE topics (
     id SERIAL PRIMARY KEY,
     topic_name TEXT NOT NULL,
     bank_id INT NOT NULL,
     FOREIGN KEY (bank_id) REFERENCES question_bank(id)
 );
 
-CREATE TABLE question (
+CREATE TABLE questions (
     id SERIAL PRIMARY KEY,
     question_text TEXT NOT NULL,
     image_url TEXT,
@@ -18,16 +19,17 @@ CREATE TABLE question (
     difficulty_level TEXT NOT NULL,
     embedding vector(3072),
     topic_id INT NOT NULL,
-    FOREIGN KEY (topic_id) REFERENCES topic(id)
+    is_ai BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (topic_id) REFERENCES topics(id)
 );
 
-CREATE TABLE answer (
+CREATE TABLE answers (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,
     label TEXT NOT NULL,
     is_correct BOOLEAN NOT NULL,
     question_id INT NOT NULL,
-    FOREIGN KEY (question_id) REFERENCES question(id)
+    FOREIGN KEY (question_id) REFERENCES questions(id)
 );
 -- ============================================================
 -- INDEXES

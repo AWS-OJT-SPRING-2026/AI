@@ -1,6 +1,8 @@
 import json
 import os
+import sys
 import psycopg2
+from datetime import datetime
 from app.models.schema_question_bank import QuestionBank
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -19,6 +21,34 @@ conn = psycopg2.connect(
 
 cur = conn.cursor()
 
+# Lấy tên môn học từ người dùng
+subject_name = input("Nhập tên môn học (subject_name): ").strip()
+if not subject_name:
+    print("[LỖI] Tên môn học không được để trống.")
+    sys.exit(1)
+
+# Kiểm tra subject đã tồn tại chưa, nếu chưa thì tạo mới
+cur.execute(
+    "SELECT subject_id FROM subjects WHERE subject_name = %s",
+    (subject_name,)
+)
+row = cur.fetchone()
+if row:
+    subject_id = row[0]
+    print(f"Đã tìm thấy môn học '{subject_name}' với subject_id = {subject_id}")
+else:
+    now = datetime.now()
+    cur.execute(
+        """
+        INSERT INTO subjects (subject_name, created_at, updated_at)
+        VALUES (%s, %s, %s)
+        RETURNING subject_id
+        """,
+        (subject_name, now, now)
+    )
+    subject_id = cur.fetchone()[0]
+    print(f"Đã tạo môn học mới '{subject_name}' với subject_id = {subject_id}")
+
 # Load JSON
 with open("./app/extract_quiz/output_questions.json", "r", encoding="utf-8") as f:
     data = json.load(f)
@@ -36,10 +66,10 @@ for topic in data.get("topics", []):
 # Validate bằng Pydantic
 qb = QuestionBank.model_validate(data)
 
-# Insert question_bank
+# Insert question_bank (kèm subject_id)
 cur.execute(
-    "INSERT INTO question_bank (bank_name) VALUES (%s) RETURNING id",
-    (qb.bank_name,)
+    "INSERT INTO question_bank (bank_name, subject_id) VALUES (%s, %s) RETURNING id",
+    (qb.bank_name, subject_id)
 )
 
 bank_id = cur.fetchone()[0]
@@ -48,7 +78,7 @@ bank_id = cur.fetchone()[0]
 for topic in qb.topics:
     cur.execute(
         """
-        INSERT INTO topic (topic_name, bank_id)
+        INSERT INTO topics (topic_name, bank_id)
         VALUES (%s,%s)
         RETURNING id
         """,
@@ -60,7 +90,7 @@ for topic in qb.topics:
     for question in topic.questions:
         cur.execute(
             """
-            INSERT INTO question (question_text, image_url, explanation, difficulty_level, embedding, topic_id)
+            INSERT INTO questions (question_text, image_url, explanation, difficulty_level, embedding, topic_id)
             VALUES (%s,%s,%s,%s,%s,%s)
             RETURNING id
             """,
@@ -79,7 +109,7 @@ for topic in qb.topics:
         for answer in question.answers:
             cur.execute(
                 """
-                INSERT INTO answer (content, label, is_correct, question_id)
+                INSERT INTO answers (content, label, is_correct, question_id)
                 VALUES (%s,%s,%s,%s)
                 RETURNING id
                 """,

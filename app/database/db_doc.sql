@@ -1,6 +1,7 @@
 CREATE TABLE books (
     id SERIAL PRIMARY KEY,
-    book_name TEXT NOT NULL
+    book_name TEXT NOT NULL,
+    subject_id INT REFERENCES subjects(subject_id) ON DELETE CASCADE
 );
 
 CREATE TABLE chapters (

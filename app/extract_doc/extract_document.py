@@ -180,7 +180,7 @@ Mục tiêu của bạn là chuyển đổi trung thực nội dung sách giáo 
 
 data_schema = json_data["dataSchema"]
 config = ExtractConfig(**json_data["config"])
-file = "app/extract/template.pdf"
+file = "app/extract_doc/template_doc.pdf"
 try:
 
     result = extractor.extract(data_schema, config, file)
@@ -192,7 +192,7 @@ try:
     print(book.book_name)
 
     # Save JSON
-    output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output.json")
+    output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output_doc.json")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(book.model_dump(), f, ensure_ascii=False, indent=4)
 
