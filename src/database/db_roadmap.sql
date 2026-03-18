@@ -32,19 +32,6 @@ CREATE TABLE roadmap_lessons (
     FOREIGN KEY (lessonid) REFERENCES lessons(lessonid)
 );
 
-CREATE TABLE roadmap_lesson_questions (
-    id SERIAL PRIMARY KEY,
-    roadmap_lesson_id INTEGER,
-    questionid INTEGER,
-
-    student_answer TEXT,
-    correct_answer TEXT,
-
-    reason TEXT,
-
-    FOREIGN KEY (roadmap_lesson_id) REFERENCES roadmap_lessons(id) ON DELETE CASCADE
-);
-
 CREATE TABLE question_content_blocks (
     id SERIAL PRIMARY KEY,
 
