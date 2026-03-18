@@ -21,7 +21,7 @@ class OpenAIService:
             
         self.client = OpenAI(api_key=self.api_key)
 
-    def _validate_roadmap_schema(self, data: Dict[str, Any]) -> bool:
+    def _validate_explain_schema(self, data: Dict[str, Any]) -> bool:
         """
         Kiểm tra tính hợp lệ của cấu trúc trả về dựa trên yêu cầu JSON format.
         
@@ -34,23 +34,8 @@ class OpenAIService:
         if not isinstance(data, dict):
             return False
             
-        if "source_document" not in data or "roadmap" not in data:
+        if "explain" not in data or not isinstance(data.get("explain"), str):
             return False
-            
-        roadmap = data.get("roadmap")
-        if not isinstance(roadmap, list) or len(roadmap) == 0:
-            return False
-            
-        for item in roadmap:
-            required_keys = {"step", "title", "content", "reference_page", "key_takeaways"}
-            if not required_keys.issubset(item.keys()):
-                return False
-                
-            if not isinstance(item.get("step"), int):
-                return False
-                
-            if not isinstance(item.get("key_takeaways"), list):
-                return False
                 
         return True
 
@@ -86,7 +71,7 @@ class OpenAIService:
                     
                 result_data = json.loads(content)
                 
-                if not self._validate_roadmap_schema(result_data):
+                if not self._validate_explain_schema(result_data):
                     raise ValueError("JSON trả về không hợp lệ so với cấu trúc đã yêu cầu.")
                     
                 return result_data

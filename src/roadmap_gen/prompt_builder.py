@@ -1,70 +1,38 @@
 from typing import Dict, Any
 
-def build_roadmap_prompt(input_data: Dict[str, Any]) -> str:
+def build_lesson_explain_prompt(lesson_title: str, wrong_questions: list) -> str:
     """
-    Xây dựng prompt gửi tới OpenAI để tạo roadmap học tập.
+    Xây dựng prompt gửi tới OpenAI để giải thích tại sao học sinh cần ôn tập môn học này dựa trên các câu sai.
     
     Args:
-        input_data (dict): Dữ liệu đầu vào bao gồm:
-            - file_type (str): Định dạng file (VD: PDF)
-            - raw_text (str): Nội dung văn bản thô
-            - user_request (str): Yêu cầu cụ thể của người dùng
-            - focus_keywords (list): Danh sách các từ khóa cần tập trung
+        lesson_title (str): Tiêu đề của bài học.
+        wrong_questions (list): Danh sách các câu hỏi thuộc bài học này mà học sinh làm sai.
+            Mỗi câu có: question_text, selected_answer_label, correct_answer_label, correct_answer_content.
             
     Returns:
         str: Prompt hoàn chỉnh
     """
-    file_type = input_data.get("file_type", "Unknown")
-    raw_text = input_data.get("raw_text", "")
-    user_request = input_data.get("user_request", "Tạo roadmap học tập chi tiết")
-    focus_keywords = input_data.get("focus_keywords", [])
-    
-    keywords_str = ", ".join(focus_keywords) if focus_keywords else "Không có từ khóa cụ thể"
-    
-    prompt = f"""Bạn là một chuyên gia giáo dục và thiết kế chương trình học.
-Hãy phân tích nội dung tài liệu dưới đây và tạo một lộ trình học tập (roadmap) dựa trên yêu cầu của người dùng.
+    questions_context = ""
+    for idx, q in enumerate(wrong_questions, 1):
+        questions_context += f"Câu hỏi {idx}: {q.get('question_text')}\n"
+        questions_context += f"- Lựa chọn sai của học sinh: {q.get('selected_answer_label')}\n"
+        questions_context += f"- Đáp án đúng: {q.get('correct_answer_label')} - {q.get('correct_answer_content')}\n\n"
+        
+    prompt = f"""Bạn là một giáo viên tận tâm đang phân tích kết quả bài kiểm tra của một học sinh.
+Vừa qua, học sinh đã làm sai một số câu hỏi thuộc bài học: "{lesson_title}".
 
-THÔNG TIN TÀI LIỆU:
-- Loại tài liệu: {file_type}
-- Nội dung tài liệu:
-{raw_text}
+DƯỚI ĐÂY LÀ DANH SÁCH CÁC CÂU HỎI HỌC SINH ĐÃ LÀM SAI TRONG BÀI THI:
+{questions_context.strip()}
 
-YÊU CẦU CỦA NGƯỜI DÙNG:
-{user_request}
-
-TỪ KHÓA TRỌNG TÂM:
-{keywords_str}
-
-YÊU CẦU SINH ROADMAP:
-- Phân tích nội dung tài liệu để tạo roadmap.
-- Phân chia roadmap thành các bước (step) hợp lý dựa trên yêu cầu của người dùng (ví dụ: nếu yêu cầu 4 tuần, tạo ít nhất 4 step lớn).
-- Ưu tiên các nội dung liên quan đến các TỪ KHÓA TRỌNG TÂM.
-- Mỗi bước (step) PHẢI bao gồm đầy đủ các thông tin sau:
-  + step: Số thứ tự bước (số nguyên, ví dụ: 1, 2, 3).
-  + title: Tiêu đề ngắn gọn của bước học hoặc nội dung học.
-  + content: Mô tả chi tiết nội dung cần học.
-  + reference_page: Trang tham chiếu (nếu có thể suy đoán từ văn bản, nếu không hãy đặt là null hoặc một số nguyên ước lượng).
-  + key_takeaways: Danh sách các ý chính cần nắm vững.
-- Cấu trúc trả về BẮT BUỘC phải là JSON hoàn chỉnh và chính xác.
-- KHÔNG trả lời thêm bất kỳ văn bản nào ngoài JSON.
-- KHÔNG sử dụng định dạng markdown (ví dụ: ```json ... ```).
-- KHÔNG giải thích thêm.
+YÊU CẦU DÀNH CHO BẠN:
+1. Phân tích điểm mù kiến thức của học sinh: Dựa vào sự khác biệt giữa "lựa chọn sai của học sinh" và "đáp án đúng", hãy chỉ ra học sinh đang nhầm lẫn ở điểm nào phần kiến thức này.
+2. Tại sao cần ôn tập lại bài học này: Đưa ra lời khuyên hoặc lý do thuyết phục (explain) tại sao học sinh cần dành thời gian để ôn luyện lại kiến thức bài "{lesson_title}".
+3. Viết ở ngôi thứ ba thân thiện, hướng trực tiếp đến học sinh (ví dụ: "Em đang bị nhầm lẫn giữa...", "Để cải thiện, em cần ôn tập...").
+4. Cấu trúc trả về BẮT BUỘC phải là định dạng JSON cực ngắn gọn chứa đúng một key "explain".
 
 Format kết quả BẮT BUỘC theo cấu trúc JSON sau:
 {{
-  "source_document": "Tên tài liệu hoặc nguồn gốc (ví dụ: Tài liệu từ văn bản đầu vào)",
-  "roadmap": [
-    {{
-      "step": 1,
-      "title": "Tiêu đề bước",
-      "content": "Nội dung cần học",
-      "reference_page": 1,
-      "key_takeaways": [
-        "Ý chính 1",
-        "Ý chính 2"
-      ]
-    }}
-  ]
+  "explain": "Đoạn giải thích chi tiết khoảng 3-4 câu hướng dẫn học sinh."
 }}
 """
     return prompt
