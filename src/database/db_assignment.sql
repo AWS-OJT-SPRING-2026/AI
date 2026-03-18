@@ -66,3 +66,4 @@ CREATE TABLE submission_answers (
         REFERENCES answers(id)
         ON DELETE CASCADE
 );
+
