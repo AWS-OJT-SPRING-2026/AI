@@ -1,6 +1,7 @@
 CREATE TABLE question_bank (
     id SERIAL PRIMARY KEY,
     bank_name TEXT NOT NULL,
+    userid INT REFERENCES users(userid) ON DELETE CASCADE,
     subject_id INT REFERENCES subjects(subject_id) ON DELETE CASCADE
 );
 
@@ -9,17 +10,10 @@ CREATE TABLE questions (
     question_text TEXT NOT NULL,
     image_url TEXT,
     explanation TEXT,
-    difficulty_level TEXT NOT NULL,
+    difficulty_level INT NOT NULL,
     embedding vector(3072),
-    is_ai BOOLEAN NOT NULL DEFAULT FALSE,
-    bank_id INT REFERENCES question_bank(id) ON DELETE CASCADE
-);
-
-CREATE TABLE questions_link (
-    id SERIAL PRIMARY KEY,
-    question_id INT REFERENCES questions(id) ON DELETE CASCADE,
-    lesson_id INT REFERENCES lessons(id) ON DELETE CASCADE,
-    keyword_id INT REFERENCES keywords(id) ON DELETE CASCADE
+    bank_id INT REFERENCES question_bank(id) ON DELETE CASCADE,
+    is_ai BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE answers (
@@ -33,15 +27,19 @@ CREATE TABLE answers (
 -- ============================================================
 -- INDEXES
 -- ============================================================
- 
+
 -- question_bank
 CREATE INDEX idx_question_bank_bank_name ON question_bank(bank_name);
- 
+
+-- topic
+CREATE INDEX idx_topic_bank_id ON topic(bank_id);
+CREATE INDEX idx_topic_topic_name ON topic(topic_name);
+
 -- question
-CREATE INDEX idx_question_bank_id ON questions(bank_id);
-CREATE INDEX idx_question_difficulty_level ON questions(difficulty_level);
-CREATE INDEX idx_question_embedding ON questions USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
- 
+CREATE INDEX idx_question_topic_id ON question(topic_id);
+CREATE INDEX idx_question_difficulty_level ON question(difficulty_level);
+CREATE INDEX idx_question_embedding ON question USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
 -- answer
-CREATE INDEX idx_answer_question_id ON answers(question_id);
+CREATE INDEX idx_answer_question_id ON answer(question_id);
 CREATE INDEX idx_answer_is_correct ON answer(is_correct);

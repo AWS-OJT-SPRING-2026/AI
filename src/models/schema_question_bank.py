@@ -11,10 +11,9 @@ class Question(BaseModel):
     question_text: str
     image_url: Optional[str] = None
     answers: list[Answer]
-    explanation: str
+    explanation: Optional[str] = None
     vector: list[float] # Vector embedding
-    difficulty_level: str # Mức độ khó: '1' (dễ), '2' (trung bình), '3' (khó)
-    keywords: Optional[list[str]] = None
+    difficulty_level: int
 
 class QuestionBank(BaseModel):
     bank_name: str

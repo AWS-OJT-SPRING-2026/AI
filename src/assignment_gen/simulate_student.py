@@ -51,44 +51,49 @@ SAMPLE_STUDENTS = [
 def ensure_students(num_students: int = 5) -> List[int]:
     """
     Đảm bảo có đủ học sinh trong database.
-    Nếu chưa đủ, tự động tạo thêm.
-    
-    Returns:
-        Danh sách studentid.
+    Tạo user và gán vào bảng students, trả về danh sách userid.
     """
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Kiểm tra học sinh đã có
-        cur.execute("SELECT studentid FROM students ORDER BY studentid")
+        # Lấy danh sách userid đã có trong bảng students
+        cur.execute("SELECT userid FROM students WHERE userid IS NOT NULL ORDER BY userid")
         existing_ids = [row[0] for row in cur.fetchall()]
 
         if len(existing_ids) >= num_students:
-            print(f"Đã có {len(existing_ids)} học sinh trong DB, sử dụng {num_students} học sinh.")
+            print(f"Đã có {len(existing_ids)} học sinh (users) trong DB, sử dụng {num_students} người.")
             return existing_ids[:num_students]
 
         # Tạo thêm học sinh
         num_to_create = num_students - len(existing_ids)
-        next_id = max(existing_ids) + 1 if existing_ids else 1
-        print(f"Đang tạo thêm {num_to_create} học sinh...")
+        
+        cur.execute("SELECT COALESCE(MAX(userid), 0) FROM users")
+        next_user_id = cur.fetchone()[0] + 1
+        
+        cur.execute("SELECT COALESCE(MAX(studentid), 0) FROM students")
+        next_student_id = cur.fetchone()[0] + 1
 
+        print(f"Đang tạo thêm {num_to_create} học sinh (users)...")
         new_ids = []
         for i in range(num_to_create):
             sample = SAMPLE_STUDENTS[i % len(SAMPLE_STUDENTS)]
-            student_id = next_id + i
+            uid = next_user_id + i
+            sid = next_student_id + i
 
-            # Thêm số vào tên nếu lặp lại tên mẫu
+            # Tạo user (Giả sử roleid = 3 là học sinh)
+            cur.execute("INSERT INTO users (userid, roleid) VALUES (%s, %s)", (uid, 3))
+
             suffix = f" {(i // len(SAMPLE_STUDENTS)) + 1}" if i >= len(SAMPLE_STUDENTS) else ""
             full_name = sample["full_name"] + suffix
 
             cur.execute(
                 """
-                INSERT INTO students (studentid, full_name, date_of_birth, gender)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO students (studentid, userid, full_name, date_of_birth, gender)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                (student_id, full_name, sample["date_of_birth"], sample["gender"])
+                (sid, uid, full_name, sample["date_of_birth"], sample["gender"])
             )
-            new_ids.append(student_id)
+            new_ids.append(uid)
 
         conn.commit()
         all_ids = existing_ids + new_ids
@@ -212,19 +217,11 @@ def simulate_student_answer(answers: List[dict], correct_probability: float = 0.
 
 def simulate_submission(
     assignment_id: int,
-    student_id: int,
+    user_id: int,
     correct_probability: float = 0.6,
 ) -> dict:
     """
-    Giả lập một học sinh làm một bài assignment.
-    
-    Params:
-        assignment_id: ID bài assignment.  
-        student_id: ID học sinh.
-        correct_probability: Xác suất trả lời đúng mỗi câu.
-    
-    Returns:
-        dict chứa submission_id, score, time_taken, detail từng câu.
+    Giả lập một học sinh (theo userid) làm một bài assignment.
     """
     questions = get_assignment_questions(assignment_id)
     if not questions:
@@ -257,24 +254,25 @@ def simulate_submission(
 
         cur.execute(
             """
-            INSERT INTO submissions (assignmentid, studentid, score, time_taken, submit_time)
+            INSERT INTO submissions (assignmentid, userid, score, time_taken, submit_time)
             VALUES (%s, %s, %s, %s, %s)
             RETURNING submissionid
             """,
-            (assignment_id, student_id, score, time_taken, submit_time)
+            (assignment_id, user_id, score, time_taken, submit_time)
         )
         submission_id = cur.fetchone()[0]
 
-        # Lưu từng câu trả lời
+        # Lưu từng câu trả lời (thêm answer_ref_id)
         for ans in answers_result:
             cur.execute(
                 """
-                INSERT INTO submission_answers (submissionid, questionid, selected_answer, is_correct)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO submission_answers (submissionid, questionid, answer_ref_id, selected_answer, is_correct)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (
                     submission_id,
                     ans["question_id"],
+                    ans["answer_id"], # Liên kết tới bảng answers theo yêu cầu DB mới
                     ans["selected_label"],
                     ans["is_correct"],
                 )
@@ -285,7 +283,7 @@ def simulate_submission(
         return {
             "submission_id": submission_id,
             "assignment_id": assignment_id,
-            "student_id": student_id,
+            "user_id": user_id,
             "score": score,
             "num_correct": num_correct,
             "total_questions": len(questions),
@@ -304,28 +302,23 @@ def simulate_submission(
 # 5. Pipeline giả lập toàn bộ
 # ==========================================
 def simulate_all(
-    assignment_id: int = None,
+    assignment_ids: List[int] = None,
+    user_ids: List[int] = None,
     num_students: int = 5,
     correct_probability: float = 0.6
 ) -> List[dict]:
     """
-    Giả lập nhiều học sinh làm bài.
-    
-    Params:
-        assignment_id: ID assignment cụ thể. Nếu None, giả lập tất cả assignments.
-        num_students: Số học sinh tham gia.
-        correct_probability: Xác suất trả lời đúng (0.0 - 1.0).
-    
-    Returns:
-        Danh sách kết quả submission.
+    Giả lập làm bài cho các học sinh cụ thể trên các assignments cụ thể.
     """
-    # Đảm bảo có đủ học sinh
-    student_ids = ensure_students(num_students)
+    # Nếu user_ids được set từ CLI trực tiếp, dùng luôn (bỏ qua num_students nếu có user_ids cụ thể)
+    if user_ids:
+        active_user_ids = user_ids
+    else:
+        # Nếu không có, tự get hoặc tạo
+        active_user_ids = ensure_students(num_students)
 
     # Xác định assignments cần giả lập
-    if assignment_id:
-        assignment_ids = [assignment_id]
-    else:
+    if not assignment_ids:
         print("Tìm tất cả assignments trong database:")
         assignment_ids = get_all_assignment_ids()
         if not assignment_ids:
@@ -334,18 +327,18 @@ def simulate_all(
     all_results = []
     for a_id in assignment_ids:
         print(f"\n--- Giả lập Assignment #{a_id} ---")
-        for s_id in student_ids:
+        for u_id in active_user_ids:
             # Thay đổi xác suất nhẹ cho mỗi học sinh (tạo sự đa dạng)
             student_prob = max(0.1, min(0.95, correct_probability + random.uniform(-0.15, 0.15)))
 
             result = simulate_submission(
                 assignment_id=a_id,
-                student_id=s_id,
+                user_id=u_id,
                 correct_probability=student_prob,
             )
             all_results.append(result)
             print(
-                f"  Học sinh #{s_id}: "
+                f"  Học sinh (UserID {u_id}): "
                 f"{result['num_correct']}/{result['total_questions']} đúng, "
                 f"điểm = {result['score']}, "
                 f"thời gian = {result['time_taken']}s"
@@ -362,12 +355,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Simulate Student - Giả lập học sinh làm bài kiểm tra")
     parser.add_argument(
-        "--assignment-id", type=int, default=None,
-        help="ID assignment cụ thể (nếu không chọn, giả lập tất cả assignments)"
+        "--assignment-ids", type=int, nargs="+", default=None,
+        help="Danh sách ID assignment cụ thể (nếu không chọn, giả lập tất cả assignments)"
+    )
+    parser.add_argument(
+        "--user-ids", type=int, nargs="+", default=None,
+        help="Danh sách ID học sinh (userid) cụ thể (nếu không nhập, tạo giả lập num-students)"
     )
     parser.add_argument(
         "--num-students", type=int, default=5,
-        help="Số lượng học sinh tham gia (mặc định 5)"
+        help="Số lượng học sinh sinh giả lập (mặc định 5). Bị bỏ qua nếu `--user-ids` có truyền vào."
     )
     parser.add_argument(
         "--correct-probability", type=float, default=0.6,
@@ -378,7 +375,8 @@ if __name__ == "__main__":
 
     try:
         results = simulate_all(
-            assignment_id=args.assignment_id,
+            assignment_ids=args.assignment_ids,
+            user_ids=args.user_ids,
             num_students=args.num_students,
             correct_probability=args.correct_probability,
         )

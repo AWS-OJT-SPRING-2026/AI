@@ -8,20 +8,6 @@
                 {
                     "lesson_number": "1",
                     "title": "Giới thiệu về Đạo hàm",
-                    "keywords": [
-                        "đạo hàm",
-                        "khả vi",
-                        "giới hạn",
-                        "quy tắc đạo hàm",
-                        "tổng",
-                        "hiệu",
-                        "tích",
-                        "thương",
-                        "hàm hợp",
-                        "cực trị",
-                        "điểm dừng",
-                        "bài toán tối ưu"
-                    ],
                     "section": [
                         {
                             "section_number": "1",
@@ -40,7 +26,8 @@
                                     "subsection_number": "1.2",
                                     "subsection_title": "Ví dụ minh họa",
                                     "content_blocks": [
-                                        "| Hàm số $f(x)$ | Đạo hàm $f'(x)$ | Ghi chú        |\n| ------------- | --------------- | -------------- |\n| $x^n$         | $nx^{n-1}$      | $n \\in R$      |\n| $\\sin x$      | $\\cos x$        | Hàm lượng giác |\n| $e^x$         | $e^x$           | Hàm mũ         |\n| $\\ln x$       | $1/x$           | $x > 0$        |"
+                                        "Hàm số $f(x)$ và đạo hàm $f'(x)$:",
+                                        "$$\\begin{array}{|c|c|l|}\\hline f(x) & f'(x) & \\text{Ghi chú}\\\\\\hline x^n & nx^{n-1} & n \\in R \\\\ \\sin x & \\cos x & \\text{Hàm lượng giác}\\\\ e^x & e^x & \\text{Hàm mũ}\\\\ \\ln x & 1/x & x > 0 \\\\ \\hline\\end{array}$$"
                                     ]
                                 }
                             ]
@@ -54,17 +41,17 @@
                                     "subsection_title": "Quy tắc cơ bản",
                                     "content_blocks": [
                                         "Cho $u(x)$ và $v(x)$ là các hàm khả vi. Các quy tắc tính đạo hàm:",
-                                        "*   **Tổng/Hiệu:** $(u \\pm v)' = u' \\pm v'$",
-                                        "*   **Tích:** $(uv)' = u'v + uv'$",
-                                        "*   **Thương:** $(\\frac{u}{v})' = \\frac{u'v - uv'}{v^2}$",
-                                        "*   **Hàm hợp:** $[f(g(x))]' = f'(g(x)) \\cdot g'(x)$"
+                                        "* Tổng/Hiệu: $(u \\pm v)' = u' \\pm v'$",
+                                        "* Tích: $(uv)' = u'v + uv'$",
+                                        "* Thương: $(\\frac{u}{v})' = \\frac{u'v - uv'}{v^2}$",
+                                        "* Hàm hợp: $[f(g(x))]' = f'(g(x)) \\cdot g'(x)$"
                                     ]
                                 },
                                 {
                                     "subsection_number": "2.2",
                                     "subsection_title": "Ví dụ áp dụng",
                                     "content_blocks": [
-                                        "Tính đạo hàm của $f(x) = x^3 \\sin x$: ",
+                                        "Tính đạo hàm của $f(x) = x^3 \\sin x$:",
                                         "$$f'(x) = (x^3)' \\cdot \\sin x + x^3 \\cdot (\\sin x)' = 3x^2 \\sin x + x^3 \\cos x$$"
                                     ]
                                 }
@@ -81,7 +68,9 @@
                                         "Quy trình tìm cực trị của hàm số $f(x)$:",
                                         "1. Tính $f'(x)$",
                                         "2. Giải phương trình $f'(x) = 0$ tìm điểm dừng $x_0$",
-                                        "3. Xét dấu $f'(x)$ hai bên $x_0$:\n    * Đổi dấu $+ \\rightarrow -$: cực đại\n    * Đổi dấu $- \\rightarrow +$: cực tiểu"
+                                        "3. Xét dấu $f'(x)$ hai bên $x_0$:",
+                                        "* Đổi dấu $+ \\rightarrow -$: cực đại",
+                                        "* Đổi dấu $- \\rightarrow +$: cực tiểu"
                                     ]
                                 },
                                 {
@@ -101,14 +90,6 @@
                 {
                     "lesson_number": "2",
                     "title": "Giới thiệu về Tích phân",
-                    "keywords": [
-                        "tích phân bất định",
-                        "nguyên hàm",
-                        "tích phân xác định",
-                        "công thức Newton–Leibniz",
-                        "ý nghĩa hình học",
-                        "bảng tích phân cơ bản"
-                    ],
                     "section": [
                         {
                             "section_number": "1",
@@ -127,7 +108,8 @@
                                     "subsection_number": "1.2",
                                     "subsection_title": "Bảng tích phân cơ bản",
                                     "content_blocks": [
-                                        "| Hàm số $f(x)$       | Nguyên hàm $F(x) + C$     |\n| ------------------- | ------------------------- |\n| $x^n$ ($n \\neq -1$) | $\\frac{x^{n+1}}{n+1} + C$ |\n| $1/x$               | $\\ln \\|x\\| + C$           |\n| $e^x$               | $e^x + C$                 |\n| $\\sin x$            | $-\\cos x + C$             |\n| $\\cos x$            | $\\sin x + C$              |"
+                                        "Hàm số $f(x)$ và nguyên hàm $F(x) + C$:",
+                                        "$$\\begin{array}{|c|c|}\\hline f(x) & F(x) + C \\\\ \\hline x^n \\quad (n \\neq -1) & \\frac{x^{n+1}}{n+1} + C \\\\ 1/x & \\ln \\|x\\| + C \\\\ e^x & e^x + C \\\\ \\sin x & -\\cos x + C \\\\ \\cos x & \\sin x + C \\\\ \\hline\\end{array}$$"
                                     ]
                                 }
                             ]

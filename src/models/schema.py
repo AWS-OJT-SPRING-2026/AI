@@ -17,7 +17,6 @@ class Section(BaseModel):
 class Lesson(BaseModel):
     lesson_number: str
     title: str
-    keywords: Optional[List[str]] = None
     section: List[Section]
 
 

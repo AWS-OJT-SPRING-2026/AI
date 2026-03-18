@@ -7,7 +7,7 @@ import psycopg2
 from dotenv import load_dotenv
 
 # Import các hàm từ quiz_generator
-from app.quiz_gen.quiz_generator import (
+from src.quiz_gen.quiz_generator import (
     get_db_connection,
     generate_and_save_quiz,
 )
@@ -93,8 +93,8 @@ def create_assignment(
     chapter_ids: List[int],
     total_questions: int,
     num_ai_questions: int = 0,
+    userid: int = None,
     classid: int = None,
-    teacherid: int = None,
     deadline: datetime = None,
 ) -> dict:
     """
@@ -106,8 +106,8 @@ def create_assignment(
         chapter_ids: Danh sách chapter IDs cần lấy câu hỏi.
         total_questions: Tổng số câu hỏi trong assignment.
         num_ai_questions: Số câu hỏi tạo bằng AI (0 = chỉ lấy từ DB).
+        userid: ID của người dùng (Giáo viên hoặc Học sinh) để gán bài kiểm tra và làm Bank.
         classid: ID lớp học (tùy chọn).
-        teacherid: ID giáo viên (tùy chọn).
         deadline: Hạn nộp (tùy chọn).
     
     Returns:
@@ -124,39 +124,53 @@ def create_assignment(
     # ---- Bước 1: Lấy câu hỏi từ database (is_ai = False) ----
     selected_db_question_ids = []
     if num_db_questions > 0:
-        print(f"Đang tìm {num_db_questions} câu hỏi có sẵn trong DB...")
-        db_questions = fetch_existing_questions_by_chapters(
+        print(f"Đang tìm {num_db_questions} câu hỏi có sẵn trong DB (is_ai=False)...")
+        db_questions_non_ai = fetch_existing_questions_by_chapters(
             subject_id=subject_id,
             chapter_ids=chapter_ids,
             is_ai=False
         )
 
-        if len(db_questions) < num_db_questions:
-            print(
-                f"[CẢNH BÁO] Chỉ tìm thấy {len(db_questions)} câu hỏi DB "
-                f"(yêu cầu {num_db_questions}). Sẽ dùng tất cả câu tìm được."
-            )
-            selected_db = db_questions
+        selected_db = []
+        if len(db_questions_non_ai) >= num_db_questions:
+            selected_db = random.sample(db_questions_non_ai, num_db_questions)
         else:
-            # Chọn ngẫu nhiên
-            selected_db = random.sample(db_questions, num_db_questions)
+            selected_db = db_questions_non_ai
+            gap = num_db_questions - len(selected_db)
+            print(f"[CẢNH BÁO] Chỉ tìm thấy {len(selected_db)} câu hỏi không-phải-AI. Đang lấy thêm {gap} câu hỏi có sẵn (is_ai=True) từ DB...")
+            
+            # Bù đắp bằng câu hỏi is_ai=True có sẵn
+            db_questions_ai = fetch_existing_questions_by_chapters(
+                subject_id=subject_id,
+                chapter_ids=chapter_ids,
+                is_ai=True
+            )
+            
+            if len(db_questions_ai) >= gap:
+                selected_db.extend(random.sample(db_questions_ai, gap))
+            else:
+                print(f"[CẢNH BÁO] DB chỉ có thêm {len(db_questions_ai)} câu hỏi AI có sẵn. Sẽ dùng tất cả.")
+                selected_db.extend(db_questions_ai)
 
         selected_db_question_ids = [q["id"] for q in selected_db]
-        print(f"Đã chọn {len(selected_db_question_ids)} câu hỏi từ DB.")
+        print(f"Đã chọn {len(selected_db_question_ids)} câu hỏi từ DB (kết hợp nếu cần).")
 
     # ---- Bước 2: Tạo câu hỏi bằng AI (nếu cần) ----
     ai_question_ids = []
     if num_ai_questions > 0:
-        print(f"Đang tạo {num_ai_questions} câu hỏi bằng AI...")
+        if not userid:
+            raise ValueError("Cần cung cấp userid để lưu câu hỏi AI gắn với ngân hàng của user.")
+        print(f"Đang tạo thêm {num_ai_questions} câu hỏi CHƯA TỪNG CÓ BẰNG AI...")
 
         # Sử dụng chapter đầu tiên nếu có, hoặc subject_id
         result = generate_and_save_quiz(
+            userid=userid,
             subject_id=subject_id,
             chapter_id=chapter_ids[0] if len(chapter_ids) == 1 else None,
-            num_questions=num_ai_questions,
+            total_questions=num_ai_questions,
         )
         ai_question_ids = result["inserted_question_ids"]
-        print(f"Đã tạo {len(ai_question_ids)} câu hỏi AI.")
+        print(f"Đã tạo thêm {len(ai_question_ids)} câu hỏi AI mới.")
 
     # ---- Bước 3: Gộp tất cả question IDs ----
     all_question_ids = selected_db_question_ids + ai_question_ids
@@ -171,13 +185,13 @@ def create_assignment(
 
         cur.execute(
             """
-            INSERT INTO assignments (classid, teacherid, title, type, status, created_at, updated_at, deadline)
+            INSERT INTO assignments (classid, userid, title, type, status, created_at, updated_at, deadline)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING assignmentid
             """,
             (
                 classid,
-                teacherid,
+                userid,
                 title,
                 "quiz",
                 "draft",
@@ -236,7 +250,7 @@ if __name__ == "__main__":
         help="Số câu hỏi tạo bằng AI (mặc định 0 = chỉ lấy từ DB)"
     )
     parser.add_argument("--class-id", type=int, default=None, help="ID lớp học (tùy chọn)")
-    parser.add_argument("--teacher-id", type=int, default=None, help="ID giáo viên (tùy chọn)")
+    parser.add_argument("--userid", type=int, required=True, help="ID người dùng (Học sinh/Giáo viên)")
     parser.add_argument("--deadline", type=str, default=None, help="Hạn nộp (format: YYYY-MM-DD HH:MM:SS)")
 
     args = parser.parse_args()
@@ -257,8 +271,8 @@ if __name__ == "__main__":
             chapter_ids=args.chapter_ids,
             total_questions=args.total_questions,
             num_ai_questions=args.num_ai_questions,
+            userid=args.userid,
             classid=args.class_id,
-            teacherid=args.teacher_id,
             deadline=deadline,
         )
 

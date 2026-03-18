@@ -21,7 +21,7 @@ conn = psycopg2.connect(
 
 cur = conn.cursor()
 
-# Lấy tên môn học từ người dùng
+# Lấy tên môn học từ ng aười dùng
 subject_name = input("Nhập tên môn học (subject_name): ").strip()
 if not subject_name:
     print("[LỖI] Tên môn học không được để trống.")
@@ -90,28 +90,6 @@ for chapter in book.chapters:
         )
 
         lesson_id = cur.fetchone()[0]
-
-        # Insert keywords for the lesson
-        if lesson.keywords:
-            for kw in lesson.keywords:
-                kw_clean = kw.strip()
-                if not kw_clean:
-                    continue
-                
-                # Check if keyword exists
-                cur.execute("SELECT id FROM keywords WHERE keyword = %s", (kw_clean,))
-                kw_row = cur.fetchone()
-                if kw_row:
-                    keyword_id = kw_row[0]
-                else:
-                    cur.execute("INSERT INTO keywords (keyword) VALUES (%s) RETURNING id", (kw_clean,))
-                    keyword_id = cur.fetchone()[0]
-                
-                # Link to lesson
-                cur.execute(
-                    "INSERT INTO lessons_link (lesson_id, keyword_id) VALUES (%s, %s)",
-                    (lesson_id, keyword_id)
-                )
 
         # Insert sections
         for section in lesson.section:

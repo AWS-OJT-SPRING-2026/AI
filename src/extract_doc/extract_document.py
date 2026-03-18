@@ -42,18 +42,6 @@ json_data = {
                                         "description": "Tiêu đề đầy đủ của bài học như xuất hiện trong sách giáo khoa.",
                                         "type": "string"
                                     },
-                                    "keywords": {
-                                        "anyOf": [{
-                                            "description": "Danh sách các từ khóa, thuật ngữ hoặc khái niệm quan trọng có trong bài học.",
-                                            "items": {
-                                                "type": "string"
-                                            },
-                                            "type": "array"
-                                        }, {
-                                            "type": "null"
-                                        }],
-                                        "description": "Danh sách các từ khóa, thuật ngữ hoặc khái niệm quan trọng có trong bài học."
-                                    },
                                     "section": {
                                         "description": "Danh sách có thứ tự các mục lớn trong bài học.",
                                         "items": {
@@ -156,7 +144,6 @@ Quy tắc trích xuất:
 3. Với mỗi bài học:
    * Trích xuất `lesson_number`
    * Trích xuất `title` (tiêu đề bài học)
-   * Trích xuất `keywords`: mảng chứa các từ khóa, khái niệm hoặc thuật ngữ chuyên ngành quan trọng nhất trong bài học này.
    * Trích xuất tất cả các mục theo thứ tự.
 4. Với mỗi mục (`section`):
    * Trích xuất `section_number` nếu có.

@@ -22,68 +22,56 @@ json_data = {
                 "description": "Danh sách câu hỏi",
                 "items": {
                     "type": "object",
+                    "required": [
+                        "question_text",
+                        "difficulty_level",
+                        "answers"
+                    ],
+                    "properties": {
+                        "question_text": {
+                            "type": "string",
+                            "description": "Nội dung câu hỏi"
+                        },
+                        "image_url": {
+                            "type": ["string", "null"],
+                            "description": "URL hình ảnh nếu có"
+                        },
+                        "difficulty_level": {
+                            "type": "integer",
+                            "description": "Mức độ câu hỏi: 1 (dễ), 2 (trung bình), 3 (khó)"
+                        },
+                        "explanation": {
+                            "type": ["string", "null"],
+                            "description": "Lời giải hoặc giải thích"
+                        },
+                        "answers": {
+                            "type": "array",
+                            "description": "Danh sách đáp án",
+                            "items": {
+                                "type": "object",
                                 "required": [
-                                    "question_text",
-                                    "difficulty_level",
-                                    "answers"
+                                    "content",
+                                    "label",
+                                    "is_correct"
                                 ],
                                 "properties": {
-                                    "question_text": {
+                                    "label": {
                                         "type": "string",
-                                        "description": "Nội dung câu hỏi"
+                                        "description": "Nhãn đáp án: A, B, C, D"
                                     },
-                                    "image_url": {
-                                        "type": ["string", "null"],
-                                        "description": "URL hình ảnh nếu có"
-                                    },
-                                    "difficulty_level": {
+                                    "content": {
                                         "type": "string",
-                                        "description": "Mức độ câu hỏi, chỉ được điền: '1' (dễ), '2' (trung bình), hoặc '3' (khó)"
+                                        "description": "Nội dung đáp án"
                                     },
-                                    "keywords": {
-                                        "anyOf": [{
-                                            "description": "Danh sách các từ khóa, khái niệm hoặc chủ đề mà câu hỏi này đang kiểm tra.",
-                                            "items": {
-                                                "type": "string"
-                                            },
-                                            "type": "array"
-                                        }, {
-                                            "type": "null"
-                                        }],
-                                        "description": "Danh sách các từ khóa, thuật ngữ hoặc chủ đề câu hỏi đề cập."
-                                    },
-                                    "explanation": {
-                                        "type": ["string", "null"],
-                                        "description": "Lời giải hoặc giải thích"
-                                    },
-                                    "answers": {
-                                        "type": "array",
-                                        "description": "Danh sách đáp án",
-                                        "items": {
-                                            "type": "object",
-                                            "required": [
-                                                "content",
-                                                "label",
-                                                "is_correct"
-                                            ],
-                                            "properties": {
-                                                "label": {
-                                                    "type": "string",
-                                                    "description": "Nhãn đáp án: A, B, C, D"
-                                                },
-                                                "content": {
-                                                    "type": "string",
-                                                    "description": "Nội dung đáp án"
-                                                },
-                                                "is_correct": {
-                                                    "type": "boolean",
-                                                    "description": "Đáp án đúng hay không"
-                                                }
-                                            }
-                                        }
+                                    "is_correct": {
+                                        "type": "boolean",
+                                        "description": "Đáp án đúng hay không"
                                     }
                                 }
                             }
+                        }
+                    }
+                }
             }
         }
     },
@@ -94,22 +82,21 @@ json_data = {
         "system_prompt": """
 Bạn là hệ thống trích xuất ngân hàng câu hỏi.
 
-Chuyển tài liệu thành JSON theo cấu trúc:
+Cố gắng trích xuất theo cấu trúc:
 
 Question Bank
-  → Question
-    → Answers
+ → Question
+   → Answers
 
 Quy tắc:
 
-1. Trích xuất tên ngân hàng câu hỏi vào `bank_name`.
+1. Trích xuất tên ngân hàng câu hỏi vào `bank_name` (nếu không rõ, hãy tự đặt phù hợp).
 
 2. Với mỗi câu hỏi:
    - `question_text`: nội dung câu hỏi
-   - `difficulty_level`: bắt buộc là '1' (nếu dễ), '2' (trung bình) hoặc '3' (khó)
+   - `difficulty_level`: Trả về số nguyên 1, 2, hoặc 3 (1 = dễ, 2 = trung bình, 3 = khó)
    - `explanation`: lời giải nếu có
    - `image_url`: nếu câu hỏi có hình
-   - `keywords`: mảng các từ khóa, khái niệm mà câu hỏi đang đề cập đến
 
 3. Với câu trắc nghiệm:
    - Tách từng đáp án A,B,C,D
@@ -127,12 +114,12 @@ Quy tắc:
 data_schema = json_data["dataSchema"]
 config = ExtractConfig(**json_data["config"])
 
-file = "./src/extract_quiz/quiz_template.pdf"
+file = "src/extract_quiz/quiz_template.pdf"
 
 try:
     result = extractor.extract(data_schema, config, file)
 
-    output_path = "./src/extract_quiz/output_questions.json"
+    output_path = "src/extract_quiz/output_questions.json"
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(result.data, f, ensure_ascii=False, indent=4)
