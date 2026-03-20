@@ -1,33 +1,27 @@
-import os
-import json
-from dotenv import load_dotenv
-from openai import OpenAI
-from app.models.schema import Book
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-# Load environment variables
-load_dotenv()
+from src.core.config import settings
+from src.api.router import api_router
 
-
-# ==========================================
-# Đoạn code sử dụng LLM_model cơ bản
-# ==========================================
-# Khởi tạo OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Lấy tên model từ file .env
-llm_model = os.getenv("LLM_MODEL", "gpt-5-mini")
-
-print(f"\nĐang gọi model: {llm_model} ...")
-
-# Tạo request completion
-response = client.chat.completions.create(
-    model=llm_model,
-    messages=[
-        {"role": "system", "content": "Bạn là một trợ lý AI hữu ích."},
-        {"role": "user", "content": "Xin chào, bạn có thể giúp gì cho tôi?"}
-    ]
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# In kết quả
-print("\n-------- LLM Response --------")
-print(response.choices[0].message.content)
+# Cấu hình CORS (Cross-Origin Resource Sharing) middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Thêm địa chỉ FE của bạn vào đây ở môi trường production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Nhúng router API tổng với cấu hình prefix
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to AI Backend Server. Go to /docs for Swagger UI"}
