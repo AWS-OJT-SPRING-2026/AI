@@ -1,0 +1,136 @@
+{
+  "teachers": [
+    "teacherid",
+    "userid"
+  ],
+  "users": [
+    "userid",
+    "roleid"
+  ],
+  "subjects": [
+    "subject_id",
+    "subject_name",
+    "created_at",
+    "updated_at"
+  ],
+  "students": [
+    "studentid",
+    "userid"
+  ],
+  "chapters": [
+    "id",
+    "book_id",
+    "chapter_number",
+    "title"
+  ],
+  "books": [
+    "id",
+    "book_name",
+    "subject_id"
+  ],
+  "lessons": [
+    "id",
+    "chapter_id",
+    "lesson_number",
+    "title"
+  ],
+  "sections": [
+    "id",
+    "lesson_id",
+    "section_number",
+    "section_title"
+  ],
+  "subsections": [
+    "id",
+    "section_id",
+    "subsection_number",
+    "subsection_title"
+  ],
+  "content_blocks": [
+    "id",
+    "subsection_id",
+    "content",
+    "embedding"
+  ],
+  "submission_answers": [
+    "answerid",
+    "submissionid",
+    "questionid",
+    "answer_ref_id",
+    "selected_answer",
+    "is_correct"
+  ],
+  "question_bank": [
+    "id",
+    "bank_name",
+    "userid",
+    "subject_id"
+  ],
+  "questions": [
+    "id",
+    "question_text",
+    "image_url",
+    "explanation",
+    "difficulty_level",
+    "embedding",
+    "bank_id",
+    "is_ai"
+  ],
+  "answers": [
+    "id",
+    "content",
+    "label",
+    "is_correct",
+    "question_id"
+  ],
+  "assignments": [
+    "assignmentid",
+    "classid",
+    "userid",
+    "title",
+    "type",
+    "status",
+    "created_at",
+    "updated_at",
+    "deadline"
+  ],
+  "assignment_questions": [
+    "assignmentid",
+    "questionid"
+  ],
+  "submissions": [
+    "submissionid",
+    "assignmentid",
+    "userid",
+    "score",
+    "time_taken",
+    "submit_time"
+  ],
+  "roadmaps": [
+    "roadmapid",
+    "studentid",
+    "total_time",
+    "created_at"
+  ],
+  "roadmap_chapters": [
+    "id",
+    "roadmapid",
+    "chapterid",
+    "chapter_order"
+  ],
+  "roadmap_lessons": [
+    "id",
+    "roadmap_chapter_id",
+    "lessonid",
+    "time",
+    "explain",
+    "wrong_question_count",
+    "priority_score"
+  ],
+  "question_content_blocks": [
+    "questionid",
+    "content_block_id",
+    "similarity_score",
+    "created_at"
+  ]
+}

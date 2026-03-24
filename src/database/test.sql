@@ -1,6 +1,8 @@
-select * from questions
+
+SELECT * FROM questions
+where is_ai = false
+
 select * from content_blocks
-select * from lessons
 select * from question_bank
 select * from books
 select * from students
@@ -9,6 +11,10 @@ select * from subsections
 select * from users
 select * from teachers
 select * from answers
+select * from subjects
+select * from assignments
+select * from submission_answers
+select * from submissions
 
 -- reset index
 SELECT setval('questions_id_seq', (SELECT MAX(id) FROM questions));
