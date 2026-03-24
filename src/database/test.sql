@@ -1,7 +1,9 @@
+ALTER TABLE books
+ADD COLUMN create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
 
 SELECT * FROM questions
 where is_ai = false
-
 select * from content_blocks
 select * from question_bank
 select * from books

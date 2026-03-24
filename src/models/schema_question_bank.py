@@ -12,7 +12,7 @@ class Question(BaseModel):
     image_url: Optional[str] = None
     answers: list[Answer]
     explanation: Optional[str] = None
-    vector: list[float] # Vector embedding
+    vector: Optional[list[float]] = None # Vector embedding
     difficulty_level: int
 
 class QuestionBank(BaseModel):
