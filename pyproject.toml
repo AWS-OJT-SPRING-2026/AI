@@ -15,5 +15,6 @@ dependencies = [
     "psycopg2-binary>=2.9.11",
     "pymupdf>=1.27.1",
     "pypdf2>=3.0.1",
+    "python-multipart>=0.0.22",
     "uvicorn>=0.42.0",
 ]
