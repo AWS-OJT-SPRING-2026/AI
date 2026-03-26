@@ -23,7 +23,7 @@ CREATE TABLE roadmap_lessons (
     lessonid INTEGER,
 
     time INTEGER,
-    explain TEXT,
+    explanation TEXT,
 
     wrong_question_count INTEGER,
     priority_score FLOAT,

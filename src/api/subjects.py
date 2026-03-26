@@ -66,6 +66,25 @@ class SubmissionHistoryEntry(BaseModel):
 class SubmissionHistoryResponse(BaseModel):
     history: List[SubmissionHistoryEntry]
 
+class SubmissionDetailQuestion(BaseModel):
+    id: int
+    question: str
+    options: List[str]
+    selected: Optional[int]
+    correct: int
+    explanation: str
+    subject: str
+    level: str
+    is_correct: bool
+
+class SubmissionDetailResponse(BaseModel):
+    submissionid: int
+    score: float
+    time_taken: int
+    submit_time: str
+    quiz_name: str
+    questions: List[SubmissionDetailQuestion]
+
 @router.get("/", response_model=List[Subject])
 def get_subjects():
     conn = get_db_connection()
@@ -342,6 +361,99 @@ def get_submission_history(userid: int):
     except Exception as e:
         import traceback
         print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@router.get("/submissions/{submissionid}/details", response_model=SubmissionDetailResponse)
+def get_submission_history_details(submissionid: int):
+    import logging
+    import os
+    error_log_file = os.path.join(os.getcwd(), "subjects_api_error.log")
+    logger = logging.getLogger(__name__)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # 1. Fetch submission summary
+        query_sub = """
+            SELECT s.submissionid, s.score, s.time_taken, s.submit_time
+            FROM submissions s
+            WHERE s.submissionid = %s
+        """
+        cur.execute(query_sub, (submissionid,))
+        sub_row = cur.fetchone()
+        if not sub_row:
+            raise HTTPException(status_code=404, detail="Submission not found")
+            
+        # 2. Fetch answers and question details
+        # Removed ORDER BY sa.id as it may not exist
+        query_details = """
+            SELECT 
+                q.id, q.question_text, q.explanation, q.difficulty_level, 
+                sub.subject_name, sa.selected_answer, sa.is_correct
+            FROM submission_answers sa
+            JOIN questions q ON sa.questionid = q.id
+            JOIN question_bank qb ON q.bank_id = qb.id
+            JOIN subjects sub ON qb.subject_id = sub.subject_id
+            WHERE sa.submissionid = %s
+        """
+        cur.execute(query_details, (submissionid,))
+        detail_rows = cur.fetchall()
+        
+        level_map = {1: "Dễ", 2: "Trung bình", 3: "Khó"}
+        questions_detail = []
+        
+        quiz_name = "Ôn tập"
+        if detail_rows:
+            quiz_name = detail_rows[0][4] # use subject name from first question
+
+        for d_row in detail_rows:
+            q_id, q_text, expl, diff, s_name, sel_ans_text, is_corr = d_row
+            
+            # Fetch options for this question
+            # Using ORDER BY id if label is missing, but subjects.py uses label
+            cur.execute("SELECT content, label, is_correct, id FROM answers WHERE question_id = %s ORDER BY label", (q_id,))
+            ans_rows = cur.fetchall()
+            
+            options = [r[0] for r in ans_rows]
+            correct_idx = next((i for i, r in enumerate(ans_rows) if r[2]), 0)
+            
+            # Find index of selected answer text in options
+            sel_idx = None
+            if sel_ans_text != "Unanswered":
+                try:
+                    sel_idx = options.index(sel_ans_text)
+                except ValueError:
+                    sel_idx = None
+
+            questions_detail.append(SubmissionDetailQuestion(
+                id=q_id,
+                question=q_text,
+                options=options,
+                selected=sel_idx,
+                correct=correct_idx,
+                explanation=expl or "",
+                subject=s_name,
+                level=level_map.get(diff, "Trung bình"),
+                is_correct=is_corr
+            ))
+            
+        return SubmissionDetailResponse(
+            submissionid=sub_row[0],
+            score=sub_row[1],
+            time_taken=sub_row[2],
+            submit_time=sub_row[3].strftime("%Y-%m-%d %H:%M") if sub_row[3] else "",
+            quiz_name=quiz_name,
+            questions=questions_detail
+        )
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        with open(error_log_file, "a", encoding="utf-8") as f:
+            f.write(f"\n--- ERROR at {submissionid} ---\n{err_msg}\n")
+        print(err_msg)
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cur.close()

@@ -1,0 +1,47 @@
+
+--- ERROR at 2026-03-26 20:54:08.874732 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 55, in generate_roadmap
+    cur.execute(
+psycopg2.errors.ForeignKeyViolation: insert or update on table "roadmaps" violates foreign key constraint "roadmaps_studentid_fkey"
+DETAIL:  Key (studentid)=(1) is not present in table "students".
+
+
+
+--- ERROR at 2026-03-26 20:54:22.613174 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 55, in generate_roadmap
+    cur.execute(
+psycopg2.errors.ForeignKeyViolation: insert or update on table "roadmaps" violates foreign key constraint "roadmaps_studentid_fkey"
+DETAIL:  Key (studentid)=(1) is not present in table "students".
+
+
+
+--- ERROR at 2026-03-26 20:55:18.381831 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 55, in generate_roadmap
+    cur.execute(
+psycopg2.errors.ForeignKeyViolation: insert or update on table "roadmaps" violates foreign key constraint "roadmaps_studentid_fkey"
+DETAIL:  Key (studentid)=(1) is not present in table "students".
+
+
+
+--- ERROR at 2026-03-26 21:00:58.887172 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 101, in generate_roadmap
+    cur.execute(
+psycopg2.errors.UndefinedColumn: column "explanation" of relation "roadmap_lessons" does not exist
+LINE 2: ...             (roadmap_chapter_id, lessonid, time, explanatio...
+                                                             ^
+
+
+
+--- ERROR at 2026-03-26 21:01:12.965445 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 101, in generate_roadmap
+    cur.execute(
+psycopg2.errors.UndefinedColumn: column "explanation" of relation "roadmap_lessons" does not exist
+LINE 2: ...             (roadmap_chapter_id, lessonid, time, explanatio...
+                                                             ^
+
+
