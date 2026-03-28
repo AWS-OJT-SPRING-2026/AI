@@ -15,7 +15,8 @@ async def upload_document(
     file: UploadFile = File(...),
     subject_id: int = Form(...),
     doc_type: str = Form(...), # "theory" or "question"
-    userid: int = Form(1)
+    userid: int = Form(1),
+    classid: Optional[int] = Form(None)
 ):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -33,14 +34,14 @@ async def upload_document(
             # Extract
             data = extraction_service.extract_theory(temp_path)
             # Insert
-            record_id = db_service.insert_book(data, subject_id)
+            record_id = db_service.insert_book(data, subject_id, classid)
             return {"status": "success", "message": "Theory document processed successfully", "book_id": record_id}
             
         elif doc_type == "question":
             # Extract
             data = extraction_service.extract_quiz(temp_path)
             # Insert
-            record_id = db_service.insert_quiz(data, subject_id, userid)
+            record_id = db_service.insert_quiz(data, subject_id, userid, classid)
             return {"status": "success", "message": "Question bank processed successfully", "bank_id": record_id}
             
         else:

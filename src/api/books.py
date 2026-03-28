@@ -22,11 +22,11 @@ def get_all_books():
         query = """
             SELECT b.id, b.book_name, s.subject_name, b.create_at, 'theory' as doc_type
             FROM books b
-            LEFT JOIN subjects s ON b.subject_id = s.subject_id
+            LEFT JOIN subjects s ON b.subject_id = s.subjectid
             UNION ALL
-            SELECT q.id, q.bank_name as book_name, s.subject_name, q.create_at, 'question' as doc_type
+            SELECT q.id, q.bank_name as book_name, s.subject_name, (SELECT created_at FROM users WHERE userid = q.userid LIMIT 1) as create_at, 'question' as doc_type
             FROM question_bank q
-            LEFT JOIN subjects s ON q.subject_id = s.subject_id
+            LEFT JOIN subjects s ON q.subject_id = s.subjectid
             ORDER BY create_at DESC
         """
         cur.execute(query)

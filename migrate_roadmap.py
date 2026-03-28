@@ -6,10 +6,10 @@ load_dotenv()
 
 try:
     conn = psycopg2.connect(
-        host="localhost",
-        database=os.getenv("DATABASE_NAME", "postgres"),
-        user="postgres",
-        password=os.getenv("POSTGRESQL_PASSWORD", "tuandang271")
+        host=os.getenv("DB_HOST", "localhost"),
+        database=os.getenv("DB_NAME", "postgres"),
+        user=os.getenv("DB_USERNAME", "postgres"),
+        password=os.getenv("DB_PASSWORD", "")
     )
     cur = conn.cursor()
     

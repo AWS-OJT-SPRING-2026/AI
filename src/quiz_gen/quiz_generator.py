@@ -59,10 +59,10 @@ def get_db_connection():
     Tạo kết nối PostgreSQL sử dụng biến môi trường.
     """
     conn = psycopg2.connect(
-        host="localhost",
-        database=os.getenv("DATABASE_NAME"),
-        user="postgres",
-        password=os.getenv("POSTGRESQL_PASSWORD")
+        host=os.getenv("DB_HOST", "localhost"),
+        database=os.getenv("DB_NAME", "postgres"),
+        user=os.getenv("DB_USERNAME", "postgres"),
+        password=os.getenv("DB_PASSWORD", "")
     )
     return conn
 

@@ -45,3 +45,45 @@ LINE 2: ...             (roadmap_chapter_id, lessonid, time, explanatio...
                                                              ^
 
 
+
+--- ERROR at 2026-03-28 21:59:56.670458 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 127, in generate_roadmap
+    return RoadmapResponse(
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\trums\EduCarre - AWS\AI\.venv\Lib\site-packages\pydantic\main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for RoadmapResponse
+created_at
+  Input should be a valid datetime [type=datetime_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/datetime_type
+
+
+--- ERROR at 2026-03-28 21:59:59.385385 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 127, in generate_roadmap
+    return RoadmapResponse(
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\trums\EduCarre - AWS\AI\.venv\Lib\site-packages\pydantic\main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for RoadmapResponse
+created_at
+  Input should be a valid datetime [type=datetime_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/datetime_type
+
+
+--- ERROR at 2026-03-28 22:00:26.086155 ---
+Traceback (most recent call last):
+  File "C:\Users\trums\EduCarre - AWS\AI\src\api\roadmap.py", line 127, in generate_roadmap
+    return RoadmapResponse(
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\trums\EduCarre - AWS\AI\.venv\Lib\site-packages\pydantic\main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for RoadmapResponse
+created_at
+  Input should be a valid datetime [type=datetime_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/datetime_type
+

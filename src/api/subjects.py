@@ -90,7 +90,7 @@ def get_subjects():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT subject_id, subject_name FROM subjects ORDER BY subject_id")
+        cur.execute("SELECT subjectid AS subject_id, subject_name FROM subjects ORDER BY subjectid")
         rows = cur.fetchall()
         return [{"subject_id": row[0], "subject_name": row[1]} for row in rows]
     except Exception as e:
@@ -131,7 +131,7 @@ def get_lessons(subject_id: int):
             JOIN chapters ch ON l.chapter_id = ch.id
             JOIN books b ON ch.book_id = b.id
             WHERE b.subject_id = %s
-            ORDER BY ch.chapter_number, l.lesson_number
+            ORDER BY l.lesson_number
         """
         cur.execute(query, (subject_id,))
         rows = cur.fetchall()
@@ -159,7 +159,7 @@ def fetch_questions_review(req: QuestionRequest):
                     SELECT q.id, q.question_text, q.explanation, q.difficulty_level, q.is_ai, s.subject_name
                     FROM questions q
                     JOIN question_bank qb ON q.bank_id = qb.id
-                    JOIN subjects s ON qb.subject_id = s.subject_id
+                    JOIN subjects s ON qb.subject_id = s.subjectid
                     WHERE q.id IN (
                         SELECT qcb.questionid
                         FROM question_content_blocks qcb
@@ -185,8 +185,8 @@ def fetch_questions_review(req: QuestionRequest):
                     SELECT q.id, q.question_text, q.explanation, q.difficulty_level, q.is_ai, s.subject_name
                     FROM questions q
                     JOIN question_bank qb ON q.bank_id = qb.id
-                    JOIN subjects s ON qb.subject_id = s.subject_id
-                    WHERE s.subject_id = %s AND q.is_ai = FALSE
+                    JOIN subjects s ON qb.subject_id = s.subjectid
+                    WHERE s.subjectid = %s AND q.is_ai = FALSE
                     AND q.id NOT IN %s
                     ORDER BY RANDOM()
                     LIMIT %s
@@ -340,7 +340,7 @@ def get_submission_history(userid: int):
                 WHERE sa.submissionid = s.submissionid
                 LIMIT 1
             ) AS first_q ON TRUE
-            LEFT JOIN subjects sub ON first_q.subject_id = sub.subject_id
+            LEFT JOIN subjects sub ON first_q.subject_id = sub.subjectid
             WHERE s.userid = %s
             ORDER BY s.submit_time DESC
             LIMIT 20
@@ -396,7 +396,7 @@ def get_submission_history_details(submissionid: int):
             FROM submission_answers sa
             JOIN questions q ON sa.questionid = q.id
             JOIN question_bank qb ON q.bank_id = qb.id
-            JOIN subjects sub ON qb.subject_id = sub.subject_id
+            JOIN subjects sub ON qb.subject_id = sub.subjectid
             WHERE sa.submissionid = %s
         """
         cur.execute(query_details, (submissionid,))

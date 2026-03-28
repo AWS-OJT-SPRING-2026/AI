@@ -1,6 +1,6 @@
 import os
 import psycopg2
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from openai import OpenAI
 from src.quiz_gen.quiz_generator import get_db_connection
 from src.models.schema import Book
@@ -10,14 +10,14 @@ class DBService:
     def __init__(self):
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def insert_book(self, book: Book, subject_id: int):
+    def insert_book(self, book: Book, subject_id: int, classid: Optional[int] = None):
         conn = get_db_connection()
         cur = conn.cursor()
         try:
             # Insert book
             cur.execute(
-                "INSERT INTO books (book_name, subject_id) VALUES (%s, %s) RETURNING id",
-                (book.book_name, subject_id)
+                "INSERT INTO books (book_name, subject_id, classid) VALUES (%s, %s, %s) RETURNING id",
+                (book.book_name, subject_id, classid)
             )
             book_id = cur.fetchone()[0]
 
@@ -71,7 +71,7 @@ class DBService:
             cur.close()
             conn.close()
 
-    def insert_quiz(self, data: Dict[str, Any], subject_id: int, userid: int = 1):
+    def insert_quiz(self, data: Dict[str, Any], subject_id: int, userid: int = 1, classid: Optional[int] = None):
         # Validate data
         qb = QuestionBank.model_validate(data)
         
@@ -88,10 +88,13 @@ class DBService:
             row = cur.fetchone()
             if row:
                 bank_id = row[0]
+                # Update classid if it was NULL but now we have it
+                if classid:
+                    cur.execute("UPDATE question_bank SET classid = %s WHERE id = %s", (classid, bank_id))
             else:
                 cur.execute(
-                    "INSERT INTO question_bank (bank_name, userid, subject_id) VALUES (%s, %s, %s) RETURNING id",
-                    (qb.bank_name or f"Bank - {subject_id}", userid, subject_id)
+                    "INSERT INTO question_bank (bank_name, userid, subject_id, classid) VALUES (%s, %s, %s, %s) RETURNING id",
+                    (qb.bank_name or f"Bank - {subject_id}", userid, subject_id, classid)
                 )
                 bank_id = cur.fetchone()[0]
 
@@ -107,10 +110,10 @@ class DBService:
 
                 cur.execute(
                     """
-                    INSERT INTO questions (question_text, image_url, explanation, difficulty_level, embedding, bank_id)
-                    VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+                    INSERT INTO questions (question_text, image_url, explanation, difficulty_level, embedding, bank_id, is_ai)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
                     """,
-                    (q.question_text, q.image_url, q.explanation, q.difficulty_level, q.vector, bank_id)
+                    (q.question_text, q.image_url, q.explanation, q.difficulty_level, q.vector, bank_id, True)
                 )
                 question_id = cur.fetchone()[0]
 

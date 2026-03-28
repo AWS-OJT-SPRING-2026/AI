@@ -45,7 +45,7 @@ def generate_roadmap(req: RoadmapRequest):
     cur = conn.cursor()
     try:
         # 1. Fetch subject name
-        cur.execute("SELECT subject_name FROM subjects WHERE subject_id = %s", (req.subject_id,))
+        cur.execute("SELECT subject_name FROM subjects WHERE subjectid = %s", (req.subject_id,))
         subject_row = cur.fetchone()
         if not subject_row:
             raise HTTPException(status_code=404, detail="Subject not found")
@@ -152,12 +152,12 @@ def get_current_roadmap(userid: int):
     try:
         # Fetch the latest roadmap for the user
         cur.execute("""
-            SELECT r.roadmapid, r.studentid, r.total_time, r.created_at, s.subject_id, s.subject_name
+            SELECT r.roadmapid, r.studentid, r.total_time, r.created_at, s.subjectid, s.subject_name
             FROM roadmaps r
             JOIN roadmap_chapters rc ON r.roadmapid = rc.roadmapid
             JOIN chapters ch ON rc.chapterid = ch.id
             JOIN books b ON ch.book_id = b.id
-            JOIN subjects s ON b.subject_id = s.subject_id
+            JOIN subjects s ON b.subject_id = s.subjectid
             WHERE r.studentid = %s
             ORDER BY r.created_at DESC
             LIMIT 1
