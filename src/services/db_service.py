@@ -133,7 +133,7 @@ class DBService:
                     INSERT INTO questions (question_text, image_url, explanation, difficulty_level, embedding, bank_id, is_ai)
                     VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
                     """,
-                    (q.question_text, q.image_url, q.explanation, q.difficulty_level, q.vector, bank_id, True)
+                    (q.question_text, q.image_url, q.explanation, q.difficulty_level, q.vector, bank_id, False)
                 )
                 question_id = cur.fetchone()[0]
 
