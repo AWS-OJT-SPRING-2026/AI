@@ -42,7 +42,27 @@ class DBService:
                         )
                         section_id = cur.fetchone()[0]
 
-                        if section.content:
+                        if section.subsections:
+                            for sub in section.subsections:
+                                cur.execute(
+                                    "INSERT INTO subsections (section_id, subsection_number, subsection_title) VALUES (%s, %s, %s) RETURNING id",
+                                    (section_id, sub.subsection_number, sub.subsection_title)
+                                )
+                                subsection_id = cur.fetchone()[0]
+                                for block in (sub.content_blocks or []):
+                                    block = block.strip()
+                                    if not block:
+                                        continue
+                                    response = self.openai_client.embeddings.create(
+                                        model="text-embedding-3-large",
+                                        input=block
+                                    )
+                                    embedding = response.data[0].embedding
+                                    cur.execute(
+                                        "INSERT INTO content_blocks (subsection_id, content, embedding) VALUES (%s, %s, %s)",
+                                        (subsection_id, block, embedding)
+                                    )
+                        elif section.content:
                             cur.execute(
                                 "INSERT INTO subsections (section_id, subsection_number, subsection_title) VALUES (%s, %s, %s) RETURNING id",
                                 (section_id, "1", None)

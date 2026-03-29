@@ -2,10 +2,17 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 
+class Subsection(BaseModel):
+    subsection_number: str
+    subsection_title: Optional[str] = None
+    content_blocks: Optional[List[str]] = None
+
+
 class Section(BaseModel):
     section_number: str
     section_title: Optional[str] = None
-    content: Optional[str] = None
+    content: Optional[str] = None          # simple flat content (legacy)
+    subsections: Optional[List[Subsection]] = None  # full hierarchical content
 
 
 class Lesson(BaseModel):

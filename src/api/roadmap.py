@@ -27,7 +27,7 @@ class RoadmapResponse(BaseModel):
     subject_id: int
     subject_name: str
     total_time: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     chapters: List[RoadmapChapterDetail]
 
 class RoadmapRequest(BaseModel):
@@ -53,7 +53,7 @@ def generate_roadmap(req: RoadmapRequest):
 
         # 2. Create Roadmap entry
         cur.execute(
-            "INSERT INTO roadmaps (studentid, total_time) VALUES (%s, %s) RETURNING roadmapid, created_at",
+            "INSERT INTO roadmaps (studentid, total_time, created_at) VALUES (%s, %s, NOW()) RETURNING roadmapid, created_at",
             (req.userid, req.total_weeks)
         )
         roadmap_row = cur.fetchone()
