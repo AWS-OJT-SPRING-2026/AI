@@ -18,6 +18,7 @@ class Section(BaseModel):
 class Lesson(BaseModel):
     lesson_number: str
     title: str
+    estimated_time: int = 1
     section: List[Section]
 
 

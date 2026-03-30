@@ -70,6 +70,7 @@ async def upload_document(
             doc_type=type,
             user_id=user_id,
             extraction_service=extraction_service,
+            original_filename=file.filename,
         )
 
         # Build response message

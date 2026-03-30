@@ -16,7 +16,8 @@ CREATE TABLE lessons (
     id SERIAL PRIMARY KEY,
     chapter_id INT REFERENCES chapters(id) ON DELETE CASCADE,   
     lesson_number VARCHAR(10),
-    title TEXT
+    title TEXT,
+    estimated_time INT DEFAULT 1
 );
 
 

@@ -1,5 +1,6 @@
 import os
 import psycopg2
+import shutil
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
 from src.quiz_gen.quiz_generator import get_db_connection
@@ -24,90 +25,161 @@ class DBService:
         )
         return cur.fetchone() is not None
 
+    def _lessons_has_estimated_time_column(self, cur) -> bool:
+        cur.execute(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'lessons'
+              AND column_name = 'estimated_time'
+            LIMIT 1
+            """
+        )
+        return cur.fetchone() is not None
+
+    def _word_count(self, text: str) -> int:
+        return len([token for token in (text or "").split() if token.strip()])
+
+    def _estimate_lesson_time(self, lesson) -> int:
+        total_words = 0
+        for section in (lesson.section or []):
+            if section.subsections:
+                for sub in section.subsections:
+                    for block in (sub.content_blocks or []):
+                        total_words += self._word_count(block)
+            elif section.content:
+                total_words += self._word_count(section.content)
+        return max(1, round(total_words / 200))
+
+    def _store_uploaded_file(self, file_path: str, original_filename: str, user_id: int, subject_id: int, doc_type: str) -> str:
+        storage_root = os.getenv("DOCUMENT_STORAGE_DIR", "storage/documents")
+        safe_name = os.path.basename(original_filename)
+        target_dir = os.path.join(storage_root, str(user_id), str(subject_id), doc_type.lower())
+        os.makedirs(target_dir, exist_ok=True)
+        target_path = os.path.join(target_dir, safe_name)
+        shutil.copy2(file_path, target_path)
+        return target_path
+
+    def _find_existing_book_id(self, cur, book_name: str, subject_id: int, user_id: int) -> Optional[int]:
+        if self._books_has_user_id_column(cur):
+            cur.execute(
+                """
+                SELECT id
+                FROM books
+                WHERE book_name = %s
+                  AND subject_id = %s
+                  AND user_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (book_name, subject_id, user_id),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id
+                FROM books
+                WHERE book_name = %s
+                  AND subject_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (book_name, subject_id),
+            )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+    def _clear_book_hierarchy(self, cur, book_id: int):
+        cur.execute(
+            """
+            DELETE FROM content_blocks
+            WHERE subsection_id IN (
+                SELECT ss.id
+                FROM subsections ss
+                JOIN sections s ON s.id = ss.section_id
+                JOIN lessons l ON l.id = s.lesson_id
+                JOIN chapters c ON c.id = l.chapter_id
+                WHERE c.book_id = %s
+            )
+            """,
+            (book_id,),
+        )
+        cur.execute(
+            """
+            DELETE FROM subsections
+            WHERE section_id IN (
+                SELECT s.id
+                FROM sections s
+                JOIN lessons l ON l.id = s.lesson_id
+                JOIN chapters c ON c.id = l.chapter_id
+                WHERE c.book_id = %s
+            )
+            """,
+            (book_id,),
+        )
+        cur.execute(
+            """
+            DELETE FROM sections
+            WHERE lesson_id IN (
+                SELECT l.id
+                FROM lessons l
+                JOIN chapters c ON c.id = l.chapter_id
+                WHERE c.book_id = %s
+            )
+            """,
+            (book_id,),
+        )
+        cur.execute(
+            """
+            DELETE FROM lessons
+            WHERE chapter_id IN (
+                SELECT id FROM chapters WHERE book_id = %s
+            )
+            """,
+            (book_id,),
+        )
+        cur.execute("DELETE FROM chapters WHERE book_id = %s", (book_id,))
+
+    def _find_existing_bank_id(self, cur, bank_name: str, subject_id: int, userid: int) -> Optional[int]:
+        cur.execute(
+            """
+            SELECT id
+            FROM question_bank
+            WHERE bank_name = %s
+              AND subject_id = %s
+              AND userid = %s
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (bank_name, subject_id, userid),
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+    def _clear_question_bank_content(self, cur, bank_id: int):
+        cur.execute(
+            """
+            DELETE FROM answers
+            WHERE question_id IN (
+                SELECT id FROM questions WHERE bank_id = %s
+            )
+            """,
+            (bank_id,),
+        )
+        cur.execute("DELETE FROM questions WHERE bank_id = %s", (bank_id,))
+
     def insert_book(self, book: Book, subject_id: int, user_id: Optional[int] = None):
         """
         Insert a Book (theory document) into the `books` table and its nested structure.
         Now supports the `user_id` column to track the creator.
-        
+
         Returns the new book ID.
         """
         conn = get_db_connection()
         cur = conn.cursor()
         try:
-            # Support both new schema (with user_id) and legacy schema (without user_id).
-            if self._books_has_user_id_column(cur):
-                cur.execute(
-                    "INSERT INTO books (book_name, subject_id, user_id) VALUES (%s, %s, %s) RETURNING id",
-                    (book.book_name, subject_id, user_id)
-                )
-            else:
-                cur.execute(
-                    "INSERT INTO books (book_name, subject_id) VALUES (%s, %s) RETURNING id",
-                    (book.book_name, subject_id)
-                )
-            book_id = cur.fetchone()[0]
-
-            for chapter in book.chapters:
-                cur.execute(
-                    "INSERT INTO chapters (book_id, chapter_number, title) VALUES (%s, %s, %s) RETURNING id",
-                    (book_id, chapter.chapter_number, chapter.title)
-                )
-                chapter_id = cur.fetchone()[0]
-
-                for lesson in chapter.lessons:
-                    cur.execute(
-                        "INSERT INTO lessons (chapter_id, lesson_number, title) VALUES (%s, %s, %s) RETURNING id",
-                        (chapter_id, lesson.lesson_number, lesson.title)
-                    )
-                    lesson_id = cur.fetchone()[0]
-
-                    for section in lesson.section:
-                        cur.execute(
-                            "INSERT INTO sections (lesson_id, section_number, section_title) VALUES (%s, %s, %s) RETURNING id",
-                            (lesson_id, section.section_number, section.section_title)
-                        )
-                        section_id = cur.fetchone()[0]
-
-                        if section.subsections:
-                            for sub in section.subsections:
-                                cur.execute(
-                                    "INSERT INTO subsections (section_id, subsection_number, subsection_title) VALUES (%s, %s, %s) RETURNING id",
-                                    (section_id, sub.subsection_number, sub.subsection_title)
-                                )
-                                subsection_id = cur.fetchone()[0]
-                                for block in (sub.content_blocks or []):
-                                    block = block.strip()
-                                    if not block:
-                                        continue
-                                    response = self.openai_client.embeddings.create(
-                                        model="text-embedding-3-large",
-                                        input=block
-                                    )
-                                    embedding = response.data[0].embedding
-                                    cur.execute(
-                                        "INSERT INTO content_blocks (subsection_id, content, embedding) VALUES (%s, %s, %s)",
-                                        (subsection_id, block, embedding)
-                                    )
-                        elif section.content:
-                            cur.execute(
-                                "INSERT INTO subsections (section_id, subsection_number, subsection_title) VALUES (%s, %s, %s) RETURNING id",
-                                (section_id, "1", None)
-                            )
-                            subsection_id = cur.fetchone()[0]
-
-                            blocks = [b.strip() for b in section.content.split('\n\n') if b.strip()]
-                            for block in blocks:
-                                # Generate embedding
-                                response = self.openai_client.embeddings.create(
-                                    model="text-embedding-3-large",
-                                    input=block
-                                )
-                                embedding = response.data[0].embedding
-
-                                cur.execute(
-                                    "INSERT INTO content_blocks (subsection_id, content, embedding) VALUES (%s, %s, %s)",
-                                    (subsection_id, block, embedding)
-                                )
+            book_id, _ = self._insert_book_in_tx(cur, book, subject_id, user_id or 0)
             conn.commit()
             return book_id
         except Exception as e:
@@ -130,43 +202,8 @@ class DBService:
         conn = get_db_connection()
         cur = conn.cursor()
         try:
-            # 1. Ensure user exists
-            cur.execute("SELECT userid FROM users WHERE userid = %s", (userid,))
-            if not cur.fetchone():
-                cur.execute("INSERT INTO users (userid, roleid) VALUES (%s, 2)", (userid, )) # roleid 2 for teacher
-            
-            # 2. Always create a NEW question bank record (personal repository)
-            cur.execute(
-                "INSERT INTO question_bank (bank_name, userid, subject_id) VALUES (%s, %s, %s) RETURNING id",
-                (qb.bank_name or f"Bank - {subject_id}", userid, subject_id)
-            )
-            bank_id = cur.fetchone()[0]
+            bank_id, _ = self._insert_quiz_in_tx(cur, qb.model_dump(), subject_id, userid)
 
-            # 3. Insert questions
-            for q in qb.questions:
-                # Generate embedding if missing
-                if not getattr(q, 'vector', None):
-                    response = self.openai_client.embeddings.create(
-                        model="text-embedding-3-large",
-                        input=q.question_text
-                    )
-                    q.vector = response.data[0].embedding
-
-                cur.execute(
-                    """
-                    INSERT INTO questions (question_text, image_url, explanation, difficulty_level, embedding, bank_id, is_ai)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
-                    """,
-                    (q.question_text, q.image_url, q.explanation, q.difficulty_level, q.vector, bank_id, False)
-                )
-                question_id = cur.fetchone()[0]
-
-                for ans in q.answers:
-                    cur.execute(
-                        "INSERT INTO answers (content, label, is_correct, question_id) VALUES (%s, %s, %s, %s)",
-                        (ans.content, ans.label, ans.is_correct, question_id)
-                    )
-            
             conn.commit()
             return bank_id
         except Exception as e:
@@ -223,6 +260,7 @@ class DBService:
         doc_type: str,
         user_id: int,
         extraction_service,
+        original_filename: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Complete 3-step upload transaction:
@@ -239,20 +277,24 @@ class DBService:
         
         try:
             # ═══════════ STEP 1: Extract content from uploaded file ═══════════
+            incoming_name = original_filename or os.path.basename(file_path)
+
             if doc_type == "THEORY":
                 extracted_data = extraction_service.extract_theory(file_path)
+                extracted_data.book_name = incoming_name
             elif doc_type == "QUESTION":
                 extracted_data = extraction_service.extract_quiz(file_path)
+                extracted_data["bank_name"] = incoming_name
             else:
                 raise ValueError(f"Invalid doc_type: {doc_type}. Must be 'THEORY' or 'QUESTION'.")
 
             # ═══════════ STEP 2: Save to personal repository ═══════════
             if doc_type == "THEORY":
-                record_id = self._insert_book_in_tx(cur, extracted_data, subject_id, user_id)
+                record_id, upserted = self._insert_book_in_tx(cur, extracted_data, subject_id, user_id)
                 book_id = record_id
                 question_bank_id = None
             else:  # QUESTION
-                record_id = self._insert_quiz_in_tx(cur, extracted_data, subject_id, user_id)
+                record_id, upserted = self._insert_quiz_in_tx(cur, extracted_data, subject_id, user_id)
                 book_id = None
                 question_bank_id = record_id
 
@@ -260,6 +302,8 @@ class DBService:
             material_id = self._insert_classroom_material_in_tx(
                 cur, class_id, doc_type, book_id, question_bank_id, user_id
             )
+
+            stored_file_path = self._store_uploaded_file(file_path, incoming_name, user_id, subject_id, doc_type)
 
             # ═══════════ COMMIT all changes ═══════════
             conn.commit()
@@ -272,6 +316,8 @@ class DBService:
                 "class_id": class_id,
                 "subject_id": subject_id,
                 "assigned_by": user_id,
+                "upserted": upserted,
+                "stored_file_path": stored_file_path,
             }
 
         except Exception as e:
@@ -285,20 +331,37 @@ class DBService:
     # Private helpers: execute within an EXISTING transaction (cursor)
     # ──────────────────────────────────────────────────────────────────────────
 
-    def _insert_book_in_tx(self, cur, book: Book, subject_id: int, user_id: int) -> int:
-        """Insert a Book (theory) within an existing DB transaction."""
-        # Support both new schema (with user_id) and legacy schema (without user_id).
-        if self._books_has_user_id_column(cur):
-            cur.execute(
-                "INSERT INTO books (book_name, subject_id, user_id) VALUES (%s, %s, %s) RETURNING id",
-                (book.book_name, subject_id, user_id)
-            )
+    def _insert_book_in_tx(self, cur, book: Book, subject_id: int, user_id: int) -> tuple[int, bool]:
+        """Insert or update a Book (theory) within an existing DB transaction."""
+        existing_book_id = self._find_existing_book_id(cur, book.book_name, subject_id, user_id)
+        upserted = existing_book_id is not None
+        lessons_has_estimated = self._lessons_has_estimated_time_column(cur)
+
+        if upserted:
+            book_id = existing_book_id
+            if self._books_has_user_id_column(cur):
+                cur.execute(
+                    "UPDATE books SET book_name = %s, subject_id = %s, user_id = %s WHERE id = %s",
+                    (book.book_name, subject_id, user_id, book_id),
+                )
+            else:
+                cur.execute(
+                    "UPDATE books SET book_name = %s, subject_id = %s WHERE id = %s",
+                    (book.book_name, subject_id, book_id),
+                )
+            self._clear_book_hierarchy(cur, book_id)
         else:
-            cur.execute(
-                "INSERT INTO books (book_name, subject_id) VALUES (%s, %s) RETURNING id",
-                (book.book_name, subject_id)
-            )
-        book_id = cur.fetchone()[0]
+            if self._books_has_user_id_column(cur):
+                cur.execute(
+                    "INSERT INTO books (book_name, subject_id, user_id) VALUES (%s, %s, %s) RETURNING id",
+                    (book.book_name, subject_id, user_id)
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO books (book_name, subject_id) VALUES (%s, %s) RETURNING id",
+                    (book.book_name, subject_id)
+                )
+            book_id = cur.fetchone()[0]
 
         for chapter in book.chapters:
             cur.execute(
@@ -308,10 +371,17 @@ class DBService:
             chapter_id = cur.fetchone()[0]
 
             for lesson in chapter.lessons:
-                cur.execute(
-                    "INSERT INTO lessons (chapter_id, lesson_number, title) VALUES (%s, %s, %s) RETURNING id",
-                    (chapter_id, lesson.lesson_number, lesson.title)
-                )
+                estimated_time = self._estimate_lesson_time(lesson)
+                if lessons_has_estimated:
+                    cur.execute(
+                        "INSERT INTO lessons (chapter_id, lesson_number, title, estimated_time) VALUES (%s, %s, %s, %s) RETURNING id",
+                        (chapter_id, lesson.lesson_number, lesson.title, estimated_time)
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO lessons (chapter_id, lesson_number, title) VALUES (%s, %s, %s) RETURNING id",
+                        (chapter_id, lesson.lesson_number, lesson.title)
+                    )
                 lesson_id = cur.fetchone()[0]
 
                 for section in lesson.section:
@@ -359,10 +429,10 @@ class DBService:
                                 "INSERT INTO content_blocks (subsection_id, content, embedding) VALUES (%s, %s, %s)",
                                 (subsection_id, block, embedding)
                             )
-        return book_id
+        return book_id, upserted
 
-    def _insert_quiz_in_tx(self, cur, data: Dict[str, Any], subject_id: int, userid: int) -> int:
-        """Insert a Question Bank within an existing DB transaction."""
+    def _insert_quiz_in_tx(self, cur, data: Dict[str, Any], subject_id: int, userid: int) -> tuple[int, bool]:
+        """Insert or update a Question Bank within an existing DB transaction."""
         qb = QuestionBank.model_validate(data)
 
         # Ensure user exists
@@ -370,12 +440,22 @@ class DBService:
         if not cur.fetchone():
             cur.execute("INSERT INTO users (userid, roleid) VALUES (%s, 2)", (userid,))
 
-        # Always create a NEW question bank record
-        cur.execute(
-            "INSERT INTO question_bank (bank_name, userid, subject_id) VALUES (%s, %s, %s) RETURNING id",
-            (qb.bank_name or f"Bank - {subject_id}", userid, subject_id)
-        )
-        bank_id = cur.fetchone()[0]
+        bank_name = qb.bank_name or f"Bank - {subject_id}"
+        existing_bank_id = self._find_existing_bank_id(cur, bank_name, subject_id, userid)
+        upserted = existing_bank_id is not None
+        if upserted:
+            bank_id = existing_bank_id
+            cur.execute(
+                "UPDATE question_bank SET bank_name = %s, subject_id = %s, userid = %s WHERE id = %s",
+                (bank_name, subject_id, userid, bank_id),
+            )
+            self._clear_question_bank_content(cur, bank_id)
+        else:
+            cur.execute(
+                "INSERT INTO question_bank (bank_name, userid, subject_id) VALUES (%s, %s, %s) RETURNING id",
+                (bank_name, userid, subject_id)
+            )
+            bank_id = cur.fetchone()[0]
 
         # Insert questions
         for q in qb.questions:
@@ -401,7 +481,7 @@ class DBService:
                     (ans.content, ans.label, ans.is_correct, question_id)
                 )
 
-        return bank_id
+        return bank_id, upserted
 
     def _insert_classroom_material_in_tx(
         self,
