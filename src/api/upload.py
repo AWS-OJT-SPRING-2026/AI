@@ -33,15 +33,15 @@ async def upload_document(
         if doc_type == "theory":
             # Extract
             data = extraction_service.extract_theory(temp_path)
-            # Insert
-            record_id = db_service.insert_book(data, subject_id, classid)
+            # Insert (userid used as user_id for the books table)
+            record_id = db_service.insert_book(data, subject_id, user_id=userid)
             return {"status": "success", "message": "Theory document processed successfully", "book_id": record_id}
             
         elif doc_type == "question":
             # Extract
             data = extraction_service.extract_quiz(temp_path)
             # Insert
-            record_id = db_service.insert_quiz(data, subject_id, userid, classid)
+            record_id = db_service.insert_quiz(data, subject_id, userid)
             return {"status": "success", "message": "Question bank processed successfully", "bank_id": record_id}
             
         else:
