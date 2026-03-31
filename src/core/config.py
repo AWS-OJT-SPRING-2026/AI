@@ -17,6 +17,8 @@ class Settings:
     
     AWS_ACCESS_KEY: str = os.getenv("AWS_ACCESS_KEY", "")
     AWS_SECRET_KEY: str = os.getenv("AWS_SECRET_KEY", "")
+    AWS_REGION: str = os.getenv("AWS_REGION", "ap-southeast-1")
+    AWS_BUCKET_NAME: str = os.getenv("AWS_BUCKET_NAME", "")
     
     # Legacy / compatibility
     DATABASE_NAME: str = os.getenv("DB_NAME", "postgres")

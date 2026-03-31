@@ -4,6 +4,11 @@ from src.quiz_gen.quiz_generator import get_db_connection
 from pydantic import BaseModel
 from datetime import datetime
 from src.core.security import get_current_user_id
+from src.services.s3_service import s3_service
+import logging
+import traceback
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -15,6 +20,7 @@ class BookResponse(BaseModel):
     meta: str
     doc_type: Literal['theory', 'question']
     assigned_class_count: int
+    owner_id: Optional[int] = None
 
 
 class AssignedClassroomResponse(BaseModel):
@@ -55,6 +61,47 @@ def _validate_doc_type(doc_type: str) -> Literal['theory', 'question']:
     if doc_type not in ('theory', 'question'):
         raise HTTPException(status_code=400, detail='Invalid doc type')
     return doc_type
+
+
+def _is_admin(cur, user_id: int) -> bool:
+    """Return True when the user holds the ADMIN role.
+
+    Uses a savepoint so that a query failure (e.g. wrong column name) does
+    not abort the surrounding transaction.
+    """
+    try:
+        cur.execute("SAVEPOINT sp_is_admin")
+        cur.execute(
+            """
+            SELECT r.rolename
+            FROM users u
+            JOIN roles r ON r.roleid = u.roleid
+            WHERE u.userid = %s
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+        cur.execute("RELEASE SAVEPOINT sp_is_admin")
+        return row is not None and "ADMIN" in row[0].upper()
+    except Exception:
+        try:
+            cur.execute("ROLLBACK TO SAVEPOINT sp_is_admin")
+        except Exception:
+            pass
+        return False
+
+
+def _get_document_owner(cur, doc_type: Literal['theory', 'question'], doc_id: int) -> Optional[int]:
+    """Return the owner's user_id for the document, or None if it cannot be determined."""
+    if doc_type == 'theory':
+        if not _has_column(cur, 'books', 'user_id'):
+            return None
+        cur.execute("SELECT user_id FROM books WHERE id = %s", (doc_id,))
+    else:
+        cur.execute("SELECT userid FROM question_bank WHERE id = %s", (doc_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
 
 
 def _has_column(cur, table_name: str, column_name: str) -> bool:
@@ -119,39 +166,88 @@ def _get_document_info(cur, doc_type: Literal['theory', 'question'], doc_id: int
     return row
 
 @router.get("", response_model=List[BookResponse])
-def get_all_books():
+def get_all_books(user_id: int = Depends(get_current_user_id)):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        query = """
-            SELECT b.id, b.book_name, s.subject_name,
-                   COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), b.create_at) AS upload_date,
-                   'theory' as doc_type,
-                   COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), 0) AS assigned_class_count
-            FROM books b
-            LEFT JOIN subjects s ON b.subject_id = s.subjectid
-            UNION ALL
-            SELECT q.id, q.bank_name as book_name, s.subject_name,
-                   COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), NOW()) as upload_date,
-                   'question' as doc_type,
-                   COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), 0) AS assigned_class_count
-            FROM question_bank q
-            LEFT JOIN subjects s ON q.subject_id = s.subjectid
-            ORDER BY upload_date DESC
-        """
-        cur.execute(query)
+        has_book_user_id = _has_column(cur, 'books', 'user_id')
+        is_admin = _is_admin(cur, user_id)
+
+        # Columns: id, book_name, subject_name, upload_date, doc_type, assigned_class_count, owner_id
+        if has_book_user_id:
+            if is_admin:
+                # Admin sees every document from every teacher
+                query = """
+                    SELECT b.id, b.book_name, s.subject_name,
+                           COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), b.create_at) AS upload_date,
+                           'theory' as doc_type,
+                           COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), 0) AS assigned_class_count,
+                           b.user_id AS owner_id
+                    FROM books b
+                    LEFT JOIN subjects s ON b.subject_id = s.subjectid
+                    UNION ALL
+                    SELECT q.id, q.bank_name, s.subject_name,
+                           COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), NOW()) as upload_date,
+                           'question' as doc_type,
+                           COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), 0) AS assigned_class_count,
+                           q.userid AS owner_id
+                    FROM question_bank q
+                    LEFT JOIN subjects s ON q.subject_id = s.subjectid
+                    ORDER BY upload_date DESC
+                """
+                cur.execute(query)
+            else:
+                # Teacher sees only their own documents
+                query = """
+                    SELECT b.id, b.book_name, s.subject_name,
+                           COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), b.create_at) AS upload_date,
+                           'theory' as doc_type,
+                           COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), 0) AS assigned_class_count,
+                           b.user_id AS owner_id
+                    FROM books b
+                    LEFT JOIN subjects s ON b.subject_id = s.subjectid
+                    WHERE b.user_id = %s
+                    UNION ALL
+                    SELECT q.id, q.bank_name, s.subject_name,
+                           COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), NOW()) as upload_date,
+                           'question' as doc_type,
+                           COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), 0) AS assigned_class_count,
+                           q.userid AS owner_id
+                    FROM question_bank q
+                    LEFT JOIN subjects s ON q.subject_id = s.subjectid
+                    WHERE q.userid = %s
+                    ORDER BY upload_date DESC
+                """
+                cur.execute(query, (user_id, user_id))
+        else:
+            # Fallback: user_id column absent — return all, owner_id unknown
+            query = """
+                SELECT b.id, b.book_name, s.subject_name,
+                       COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), b.create_at) AS upload_date,
+                       'theory' as doc_type,
+                       COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE book_id = b.id AND type='THEORY'), 0) AS assigned_class_count,
+                       NULL AS owner_id
+                FROM books b
+                LEFT JOIN subjects s ON b.subject_id = s.subjectid
+                UNION ALL
+                SELECT q.id, q.bank_name, s.subject_name,
+                       COALESCE((SELECT MAX(assigned_at) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), NOW()) as upload_date,
+                       'question' as doc_type,
+                       COALESCE((SELECT COUNT(DISTINCT class_id) FROM classroom_materials WHERE question_bank_id = q.id AND type='QUESTION'), 0) AS assigned_class_count,
+                       NULL AS owner_id
+                FROM question_bank q
+                LEFT JOIN subjects s ON q.subject_id = s.subjectid
+                ORDER BY upload_date DESC
+            """
+            cur.execute(query)
+
         rows = cur.fetchall()
-        
         books = []
         for row in rows:
             name = row[1]
             ext = name.split('.')[-1].upper() if name and '.' in name else 'DOC'
             doc_type = row[4]
-            if doc_type == 'theory':
-                meta = f"{ext} • Lý thuyết"
-            else:
-                meta = f"{ext} • Câu hỏi"
-            
+            meta = f"{ext} • {'Lý thuyết' if doc_type == 'theory' else 'Câu hỏi'}"
             books.append(BookResponse(
                 id=row[0],
                 book_name=row[1] or "Không tên",
@@ -160,6 +256,7 @@ def get_all_books():
                 meta=meta,
                 doc_type=doc_type,
                 assigned_class_count=row[5] or 0,
+                owner_id=row[6],
             ))
         return books
     except Exception as e:
@@ -373,7 +470,6 @@ def distribute_document(
 
 @router.delete("/{doc_type}/{doc_id}")
 def delete_book(doc_type: str, doc_id: int, user_id: int = Depends(get_current_user_id)):
-    _ = user_id
     normalized_type = _validate_doc_type(doc_type)
 
     conn = get_db_connection()
@@ -381,11 +477,48 @@ def delete_book(doc_type: str, doc_id: int, user_id: int = Depends(get_current_u
     try:
         table = "books" if normalized_type == "theory" else "question_bank"
 
-        # Check if exists
-        cur.execute(f"SELECT id FROM {table} WHERE id = %s", (doc_id,))
-        if not cur.fetchone():
-            raise HTTPException(status_code=404, detail="Document not found")
-        
+        # ── Ownership / permission check ──
+        owner_id = _get_document_owner(cur, normalized_type, doc_id)
+        if owner_id is not None and owner_id != user_id:
+            if not _is_admin(cur, user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Bạn không có quyền xóa tài liệu này.",
+                )
+
+        # ── Fetch file_url for S3 deletion (before touching DB) ──
+        file_url: Optional[str] = None
+        if _has_column(cur, table, "file_url"):
+            cur.execute(f"SELECT file_url FROM {table} WHERE id = %s", (doc_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Document not found")
+            file_url = row[0]
+        else:
+            cur.execute(f"SELECT id FROM {table} WHERE id = %s", (doc_id,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="Document not found")
+
+        # ── Delete from S3 first ──
+        if file_url:
+            try:
+                found = s3_service.delete_document(file_url)
+                if not found:
+                    logger.warning(
+                        "[DELETE] S3 object not found, continuing with DB delete: %s", file_url
+                    )
+            except RuntimeError as exc:
+                logger.error("[DELETE S3 ERROR] %s", traceback.format_exc())
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Không thể xóa file trên S3, tài liệu chưa bị xóa: {exc}",
+                )
+        else:
+            logger.warning(
+                "[DELETE] Không có file_url trong DB cho %s id=%s, bỏ qua bước xóa S3.",
+                normalized_type, doc_id,
+            )
+
         # Delete (cascade handles relationships for books, doing manual for questions)
         if normalized_type == 'theory':
             cur.execute("DELETE FROM classroom_materials WHERE type = 'THEORY' AND book_id = %s", (doc_id,))
