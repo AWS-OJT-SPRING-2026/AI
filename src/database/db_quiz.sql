@@ -2,7 +2,8 @@ CREATE TABLE question_bank (
     id SERIAL PRIMARY KEY,
     bank_name TEXT NOT NULL,
     userid INT REFERENCES users(userid) ON DELETE CASCADE,
-    subject_id INT REFERENCES subjects(subject_id) ON DELETE CASCADE
+    subject_id INT REFERENCES subjects(subject_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE questions (

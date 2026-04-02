@@ -24,10 +24,41 @@ class DBService:
                 "ALTER TABLE books ADD COLUMN IF NOT EXISTS user_id INTEGER"
             )
             cur.execute(
+                "ALTER TABLE books ADD COLUMN IF NOT EXISTS create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            )
+            cur.execute(
                 "ALTER TABLE books ADD COLUMN IF NOT EXISTS file_url TEXT"
             )
             cur.execute(
                 "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS file_url TEXT"
+            )
+            cur.execute(
+                "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            )
+            cur.execute(
+                "ALTER TABLE classroom_materials ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            )
+            cur.execute(
+                "ALTER TABLE classroom_materials ALTER COLUMN assigned_at SET DEFAULT CURRENT_TIMESTAMP"
+            )
+            cur.execute(
+                "UPDATE classroom_materials SET assigned_at = CURRENT_TIMESTAMP WHERE assigned_at IS NULL"
+            )
+            cur.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'fk_books_user_id'
+                    ) THEN
+                        ALTER TABLE books
+                        ADD CONSTRAINT fk_books_user_id
+                        FOREIGN KEY (user_id) REFERENCES users(userid) ON DELETE CASCADE;
+                    END IF;
+                END $$;
+                """
             )
             conn.commit()
         except Exception as exc:
@@ -338,8 +369,8 @@ class DBService:
         try:
             cur.execute(
                 """
-                INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id, assigned_at)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 RETURNING id
                 """,
                 (class_id, material_type, book_id, question_bank_id, assigned_by_user_id)
@@ -638,8 +669,8 @@ class DBService:
         """Insert a new classroom_material row within an existing transaction."""
         cur.execute(
             """
-            INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id, assigned_at)
+            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             RETURNING id
             """,
             (class_id, material_type, book_id, question_bank_id, assigned_by_user_id)

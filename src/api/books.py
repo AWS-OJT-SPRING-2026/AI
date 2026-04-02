@@ -436,16 +436,16 @@ def distribute_document(
                 if normalized_type == 'theory':
                     cur.execute(
                         """
-                        INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id)
-                        VALUES (%s, 'THEORY', %s, NULL, %s)
+                        INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id, assigned_at)
+                        VALUES (%s, 'THEORY', %s, NULL, %s, NOW())
                         """,
                         (class_id, doc_id, user_id),
                     )
                 else:
                     cur.execute(
                         """
-                        INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id)
-                        VALUES (%s, 'QUESTION', NULL, %s, %s)
+                        INSERT INTO classroom_materials (class_id, type, book_id, question_bank_id, assigned_by_user_id, assigned_at)
+                        VALUES (%s, 'QUESTION', NULL, %s, %s, NOW())
                         """,
                         (class_id, doc_id, user_id),
                     )

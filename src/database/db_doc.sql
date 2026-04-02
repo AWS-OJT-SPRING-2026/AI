@@ -2,6 +2,7 @@ CREATE TABLE books (
     id SERIAL PRIMARY KEY,
     book_name TEXT NOT NULL,
     create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_id INT REFERENCES users(userid) ON DELETE CASCADE,
     subject_id INT REFERENCES subjects(subject_id) ON DELETE CASCADE
 );
 
