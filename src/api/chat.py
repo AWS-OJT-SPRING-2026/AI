@@ -17,9 +17,9 @@ REGION = settings.AWS_REGION
 
 
 def _get_bedrock_client():
-    """Tạo Bedrock Agent Runtime client dùng AWS credentials từ .env"""
+    """Tạo Bedrock AgentCore Runtime client dùng AWS credentials từ .env"""
     return boto3.client(
-        "bedrock-agent-runtime",
+        "bedrock-agentcore",  # AWS service mới cho AgentCore
         region_name=REGION,
         aws_access_key_id=settings.AWS_ACCESS_KEY,
         aws_secret_access_key=settings.AWS_SECRET_KEY,
@@ -29,53 +29,43 @@ def _get_bedrock_client():
 @router.post("/chat")
 async def chat_proxy(request: Request):
     """
-    Nhận tin nhắn từ Frontend, chuyển tới Bedrock Agent, stream kết quả về.
-
-    Request body (giống format cũ):
-    {
-        "prompt": "Xin chào Slozy!",
-        "session_id": "user123_session_001",
-        "user_name": "Nguyễn Văn A"
-    }
-
-    Response: SSE stream — data: {"token": "..."}\n\n
+    Nhận tin nhắn từ Frontend, chuyển tới Bedrock AgentCore.
     """
     body = await request.json()
     prompt = body.get("prompt", "Xin chào!")
     session_id = body.get("session_id", "default-session-0001")
     user_name = body.get("user_name", "")
 
-    # Đảm bảo session_id đủ dài (AWS yêu cầu >= 2 ký tự)
-    if len(session_id) < 2:
-        session_id = f"session-{session_id}-pad"
-
-    # Chuẩn bị input text (gửi kèm tên user nếu có)
-    input_text = prompt
-    if user_name:
-        input_text = f"(Hệ thống báo: Bạn đang chat với học sinh tên là {user_name}. Hãy xưng hô thân thiện nếu cần)\n\n{prompt}"
+    # Chuẩn bị payload đúng chuẩn Giao tiếp của AgentCore Container
+    request_payload = {
+        "prompt": prompt,
+        "session_id": session_id,
+        "user_name": user_name
+    }
 
     async def stream_agent_response():
-        """Generator gọi Bedrock Agent và stream kết quả dạng SSE"""
+        """Generator gọi Bedrock AgentCore (Method A) và stream kết quả dạng SSE"""
         try:
             client = _get_bedrock_client()
-            response = client.invoke_agent(
-                agentId=AGENT_ID,
-                agentAliasId=AGENT_ALIAS_ID,
-                sessionId=session_id,
-                inputText=input_text,
+            
+            # API mới invoke_agent_runtime
+            response = client.invoke_agent_runtime(
+                agentRuntimeArn=f"arn:aws:bedrock-agentcore:{REGION}:982092375481:runtime/{AGENT_ID}",
+                runtimeSessionId=session_id,
+                payload=json.dumps(request_payload).encode("utf-8")
             )
 
-            # Đọc stream từ Bedrock Agent
-            for event in response.get("completion", []):
-                if "chunk" in event:
-                    chunk_bytes = event["chunk"].get("bytes", b"")
-                    if chunk_bytes:
-                        text = chunk_bytes.decode("utf-8")
-                        # Gửi về Frontend đúng format SSE cũ
-                        yield f"data: {json.dumps({'token': text})}\n\n"
+            # Lấy data trả về từ AgentCore (StreamingBody)
+            stream = response.get("response")
+            if stream:
+                for line in stream.iter_lines():
+                    if line:
+                        chunk_text = line.decode('utf-8')
+                        # Phun thẳng từng dòng trả về cho Frontend
+                        yield f"{chunk_text}\n"
 
         except Exception as e:
-            error_msg = f"Lỗi kết nối Agent: {str(e)}"
+            error_msg = f"Lỗi kết nối AgentCore: {str(e)}"
             yield f"data: {json.dumps({'token': error_msg})}\n\n"
 
     return StreamingResponse(
