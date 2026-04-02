@@ -19,7 +19,7 @@ api_router.include_router(upload_router, prefix="/upload", tags=["Upload"])
 api_router.include_router(roadmap_router, prefix="/roadmap", tags=["Roadmap"])
 api_router.include_router(classrooms_router, prefix="/classrooms", tags=["Classrooms"])
 api_router.include_router(documents_router, prefix="/documents", tags=["Documents"])
-api_router.include_router(chat_router, tags=["Chat"])
+api_router.include_router(chat_router, prefix="/chat", tags=["Chat"])
 
 # Một route test tạm thời trong scope của API
 @api_router.get("/health")

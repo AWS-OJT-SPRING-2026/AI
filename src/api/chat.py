@@ -26,7 +26,7 @@ def _get_bedrock_client():
     )
 
 
-@router.post("/chat")
+@router.post("")
 async def chat_proxy(request: Request):
     """
     Nhận tin nhắn từ Frontend, chuyển tới Bedrock AgentCore.
