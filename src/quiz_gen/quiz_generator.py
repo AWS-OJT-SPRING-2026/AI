@@ -294,6 +294,26 @@ def _get_subject_id_from_lesson(lesson_id: int) -> Optional[int]:
         conn.close()
 
 
+def _resolve_subject_columns(cur) -> Tuple[str, str]:
+    """Trả về tên cột id và name thực tế của bảng subjects."""
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'subjects'
+        """
+    )
+    cols = {row[0].lower() for row in cur.fetchall()}
+
+    id_col = "subject_id" if "subject_id" in cols else "subjectid" if "subjectid" in cols else None
+    name_col = "subject_name" if "subject_name" in cols else "subjectname" if "subjectname" in cols else None
+
+    if not id_col or not name_col:
+        raise RuntimeError("Bảng subjects thiếu cột định danh hoặc tên môn học tương thích.")
+
+    return id_col, name_col
+
+
 def get_or_create_question_bank(userid: int, subject_id: int) -> int:
     """Tạo hoặc lấy ra question_bank của userid với môn học."""
     conn = get_db_connection()
@@ -312,8 +332,12 @@ def get_or_create_question_bank(userid: int, subject_id: int) -> int:
         if row:
             return row[0]
         
-        # Lấy tên môn học
-        cur.execute("SELECT subject_name FROM subjects WHERE subject_id = %s", (subject_id,))
+        # Lấy tên môn học theo schema thực tế của môi trường hiện tại.
+        subject_id_col, subject_name_col = _resolve_subject_columns(cur)
+        cur.execute(
+            f"SELECT {subject_name_col} FROM subjects WHERE {subject_id_col} = %s",
+            (subject_id,)
+        )
         subject_row = cur.fetchone()
         subject_name = subject_row[0] if subject_row else f"Subject_{subject_id}"
 

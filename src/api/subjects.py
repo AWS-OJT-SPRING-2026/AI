@@ -6,6 +6,26 @@ import random
 
 router = APIRouter()
 
+
+def _resolve_subject_columns(cur):
+    """Hỗ trợ cả schema subjects kiểu subject_id/subject_name và subjectid/subjectname."""
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'subjects'
+        """
+    )
+    cols = {row[0].lower() for row in cur.fetchall()}
+
+    id_col = "subject_id" if "subject_id" in cols else "subjectid" if "subjectid" in cols else None
+    name_col = "subject_name" if "subject_name" in cols else "subjectname" if "subjectname" in cols else None
+
+    if not id_col or not name_col:
+        raise RuntimeError("Subjects schema incompatible: missing subject id/name column.")
+
+    return id_col, name_col
+
 class Subject(BaseModel):
     subject_id: int
     subject_name: str
@@ -90,7 +110,11 @@ def get_subjects():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT subjectid AS subject_id, subject_name FROM subjects ORDER BY subjectid")
+        subject_id_col, subject_name_col = _resolve_subject_columns(cur)
+        cur.execute(
+            f"SELECT {subject_id_col} AS subject_id, {subject_name_col} AS subject_name "
+            f"FROM subjects ORDER BY {subject_id_col}"
+        )
         rows = cur.fetchall()
         return [{"subject_id": row[0], "subject_name": row[1]} for row in rows]
     except Exception as e:
@@ -147,6 +171,9 @@ def fetch_questions_review(req: QuestionRequest):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        subject_id_col, subject_name_col = _resolve_subject_columns(cur)
+        ai_error_message = None
+
         # 1. Fetch bank questions if needed
         bank_question_count = req.num_questions - req.ai_questions
         bank_questions = []
@@ -155,11 +182,11 @@ def fetch_questions_review(req: QuestionRequest):
         if bank_question_count > 0:
             # First attempt: Specific lessons
             if req.lesson_ids:
-                query = """
-                    SELECT q.id, q.question_text, q.explanation, q.difficulty_level, q.is_ai, s.subject_name
+                query = f"""
+                    SELECT q.id, q.question_text, q.explanation, q.difficulty_level, q.is_ai, s.{subject_name_col}
                     FROM questions q
                     JOIN question_bank qb ON q.bank_id = qb.id
-                    JOIN subjects s ON qb.subject_id = s.subjectid
+                    JOIN subjects s ON qb.subject_id = s.{subject_id_col}
                     WHERE q.id IN (
                         SELECT qcb.questionid
                         FROM question_content_blocks qcb
@@ -167,7 +194,7 @@ def fetch_questions_review(req: QuestionRequest):
                         JOIN subsections sub ON cb.subsection_id = sub.id
                         JOIN sections sec ON sub.section_id = sec.id
                         JOIN lessons l ON sec.lesson_id = l.id
-                        WHERE l.id = ANY(%s)
+                        WHERE l.id = ANY(%s::int[])
                     ) AND q.is_ai = FALSE
                     ORDER BY RANDOM()
                     LIMIT %s
@@ -181,19 +208,19 @@ def fetch_questions_review(req: QuestionRequest):
             # Fallback attempt: Subject level if not enough questions found for specific lessons
             remaining_bank_needed = bank_question_count - len(bank_questions)
             if remaining_bank_needed > 0:
-                fallback_query = """
-                    SELECT q.id, q.question_text, q.explanation, q.difficulty_level, q.is_ai, s.subject_name
+                fallback_query = f"""
+                    SELECT q.id, q.question_text, q.explanation, q.difficulty_level, q.is_ai, s.{subject_name_col}
                     FROM questions q
                     JOIN question_bank qb ON q.bank_id = qb.id
-                    JOIN subjects s ON qb.subject_id = s.subjectid
-                    WHERE s.subjectid = %s AND q.is_ai = FALSE
-                    AND q.id NOT IN %s
+                    JOIN subjects s ON qb.subject_id = s.{subject_id_col}
+                    WHERE s.{subject_id_col} = %s AND q.is_ai = FALSE
+                    AND q.id <> ALL(%s::int[])
                     ORDER BY RANDOM()
                     LIMIT %s
                 """
                 # Exclude already picked IDs
                 picked_ids = [r[0] for r in bank_questions] if bank_questions else [-1]
-                cur.execute(fallback_query, (req.subject_id, tuple(picked_ids), remaining_bank_needed))
+                cur.execute(fallback_query, (req.subject_id, picked_ids, remaining_bank_needed))
                 fallback_rows = cur.fetchall()
                 for row in fallback_rows:
                     bank_questions.append(row)
@@ -233,45 +260,50 @@ def fetch_questions_review(req: QuestionRequest):
             
             # For simplicity, we'll use the first selected lesson to generate questions
             # generate_and_save_quiz handles one lesson_id at a time
-            for l_id in req.lesson_ids[:1]:
-                result = generate_and_save_quiz(
-                    userid=req.userid,
-                    lesson_id=l_id,
-                    total_questions=req.ai_questions
-                )
-                
-                for q in result['quiz_data']['questions']:
-                    options = [q['options'].get(l, "") for l in ["A", "B", "C", "D"]]
-                    correct_idx = ord(q['correct_answer']) - ord('A')
-                    
-                    level_map = {1: "Dễ", 2: "Trung bình", 3: "Khó"}
-                    
-                    # Fetch real question ID from DB for AI questions since they were saved
-                    # We can use the text to find it if needed, or if inserted_question_ids were returned
-                    # Actually, we need the answer IDs too. Let's query by text (approximate) or index.
-                    # Since generate_and_save_quiz doesn't return the mapping, let's query the newest matching questions for this user.
-                    cur.execute("SELECT id FROM questions WHERE question_text = %s AND is_ai = TRUE ORDER BY id DESC LIMIT 1", (q['question_text'],))
-                    new_q_id_row = cur.fetchone()
-                    new_q_id = new_q_id_row[0] if new_q_id_row else random.randint(10000, 99999)
+            try:
+                for l_id in req.lesson_ids[:1]:
+                    result = generate_and_save_quiz(
+                        userid=req.userid,
+                        lesson_id=l_id,
+                        total_questions=req.ai_questions
+                    )
 
-                    # Now fetch answer IDs for this new AI question
-                    cur.execute("SELECT id FROM answers WHERE question_id = %s ORDER BY label", (new_q_id,))
-                    new_ans_ids = [r[0] for r in cur.fetchall()]
+                    for q in result['quiz_data']['questions']:
+                        options = [q['options'].get(l, "") for l in ["A", "B", "C", "D"]]
+                        correct_idx = ord(q['correct_answer']) - ord('A')
 
-                    ai_questions_list.append(QuestionResponse(
-                        id=new_q_id, 
-                        type="AI Generated",
-                        subject=router.tags[0] if router.tags else "AI Support", 
-                        question=q['question_text'],
-                        options=options,
-                        answer_ref_ids=new_ans_ids if new_ans_ids else [0]*len(options),
-                        correct=correct_idx,
-                        explanation=q['explanation'],
-                        level=level_map.get(q['difficulty_level'], "Trung bình")
-                    ))
+                        level_map = {1: "Dễ", 2: "Trung bình", 3: "Khó"}
+
+                        cur.execute("SELECT id FROM questions WHERE question_text = %s AND is_ai = TRUE ORDER BY id DESC LIMIT 1", (q['question_text'],))
+                        new_q_id_row = cur.fetchone()
+                        new_q_id = new_q_id_row[0] if new_q_id_row else random.randint(10000, 99999)
+
+                        cur.execute("SELECT id FROM answers WHERE question_id = %s ORDER BY label", (new_q_id,))
+                        new_ans_ids = [r[0] for r in cur.fetchall()]
+
+                        ai_questions_list.append(QuestionResponse(
+                            id=new_q_id,
+                            type="AI Generated",
+                            subject=router.tags[0] if router.tags else "AI Support",
+                            question=q['question_text'],
+                            options=options,
+                            answer_ref_ids=new_ans_ids if new_ans_ids else [0] * len(options),
+                            correct=correct_idx,
+                            explanation=q['explanation'],
+                            level=level_map.get(q['difficulty_level'], "Trung bình")
+                        ))
+            except Exception as ai_error:
+                print(f"[fetch-questions] AI generation failed: {ai_error}")
+                ai_error_message = str(ai_error)
+                if not result_formatted:
+                    raise
 
         # Combine results
         final_questions = result_formatted + ai_questions_list
+        if not final_questions:
+            if ai_error_message:
+                raise HTTPException(status_code=400, detail=f"Không tạo được câu hỏi AI: {ai_error_message}")
+            raise HTTPException(status_code=400, detail="Không tìm thấy câu hỏi phù hợp cho lựa chọn hiện tại.")
         return final_questions
 
     except Exception as e:
@@ -329,8 +361,9 @@ def get_submission_history(userid: int):
     cur = conn.cursor()
     try:
         # Fetch submissions with subject name (taking first question's subject as representative)
-        query = """
-            SELECT s.submissionid, s.score, s.time_taken, s.submit_time, sub.subject_name
+        subject_id_col, subject_name_col = _resolve_subject_columns(cur)
+        query = f"""
+            SELECT s.submissionid, s.score, s.time_taken, s.submit_time, sub.{subject_name_col}
             FROM submissions s
             LEFT JOIN LATERAL (
                 SELECT qb.subject_id 
@@ -340,7 +373,7 @@ def get_submission_history(userid: int):
                 WHERE sa.submissionid = s.submissionid
                 LIMIT 1
             ) AS first_q ON TRUE
-            LEFT JOIN subjects sub ON first_q.subject_id = sub.subjectid
+            LEFT JOIN subjects sub ON first_q.subject_id = sub.{subject_id_col}
             WHERE s.userid = %s
             ORDER BY s.submit_time DESC
             LIMIT 20
@@ -389,14 +422,15 @@ def get_submission_history_details(submissionid: int):
             
         # 2. Fetch answers and question details
         # Removed ORDER BY sa.id as it may not exist
-        query_details = """
-            SELECT 
+        subject_id_col, subject_name_col = _resolve_subject_columns(cur)
+        query_details = f"""
+            SELECT
                 q.id, q.question_text, q.explanation, q.difficulty_level, 
-                sub.subject_name, sa.selected_answer, sa.is_correct
+                sub.{subject_name_col}, sa.selected_answer, sa.is_correct
             FROM submission_answers sa
             JOIN questions q ON sa.questionid = q.id
             JOIN question_bank qb ON q.bank_id = qb.id
-            JOIN subjects sub ON qb.subject_id = sub.subjectid
+            JOIN subjects sub ON qb.subject_id = sub.{subject_id_col}
             WHERE sa.submissionid = %s
         """
         cur.execute(query_details, (submissionid,))
