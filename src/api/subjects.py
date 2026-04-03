@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from src.quiz_gen.quiz_generator import get_db_connection, generate_and_save_quiz
 from pydantic import BaseModel
 import random
+from src.core.security import get_current_user_id
 
 router = APIRouter()
 
@@ -70,7 +71,7 @@ class SubmissionAnswer(BaseModel):
     answer_ref_id: Optional[int] = None
 
 class SubmissionRequest(BaseModel):
-    userid: int
+    userid: Optional[int] = None
     assignmentid: Optional[int] = None
     score: float
     time_taken: int
@@ -315,7 +316,7 @@ def fetch_questions_review(req: QuestionRequest):
         conn.close()
 
 @router.post("/submit-quiz")
-def submit_quiz(req: SubmissionRequest):
+def submit_quiz(req: SubmissionRequest, current_user_id: int = Depends(get_current_user_id)):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -326,7 +327,7 @@ def submit_quiz(req: SubmissionRequest):
             VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
             RETURNING submissionid
         """
-        cur.execute(query_sub, (req.assignmentid, req.userid, req.score, req.time_taken))
+        cur.execute(query_sub, (req.assignmentid, current_user_id, req.score, req.time_taken))
         submission_id = cur.fetchone()[0]
 
         # 2. Insert answers
@@ -346,6 +347,9 @@ def submit_quiz(req: SubmissionRequest):
         conn.commit()
         return {"status": "success", "submission_id": submission_id}
 
+    except HTTPException:
+        conn.rollback()
+        raise
     except Exception as e:
         conn.rollback()
         import traceback
@@ -355,8 +359,8 @@ def submit_quiz(req: SubmissionRequest):
         cur.close()
         conn.close()
 
-@router.get("/submissions/{userid}", response_model=List[SubmissionHistoryEntry])
-def get_submission_history(userid: int):
+@router.get("/submissions/me", response_model=List[SubmissionHistoryEntry])
+def get_submission_history_me(current_user_id: int = Depends(get_current_user_id)):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -375,10 +379,11 @@ def get_submission_history(userid: int):
             ) AS first_q ON TRUE
             LEFT JOIN subjects sub ON first_q.subject_id = sub.{subject_id_col}
             WHERE s.userid = %s
+              AND s.assignmentid IS NULL
             ORDER BY s.submit_time DESC
             LIMIT 20
         """
-        cur.execute(query, (userid,))
+        cur.execute(query, (current_user_id,))
         rows = cur.fetchall()
         
         history = []
@@ -391,6 +396,8 @@ def get_submission_history(userid: int):
                 quiz_name=row[4] or "Ôn tập"
             ))
         return history
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         print(traceback.format_exc())
@@ -400,7 +407,7 @@ def get_submission_history(userid: int):
         conn.close()
 
 @router.get("/submissions/{submissionid}/details", response_model=SubmissionDetailResponse)
-def get_submission_history_details(submissionid: int):
+def get_submission_history_details(submissionid: int, current_user_id: int = Depends(get_current_user_id)):
     import logging
     import os
     error_log_file = os.path.join(os.getcwd(), "subjects_api_error.log")
@@ -414,8 +421,10 @@ def get_submission_history_details(submissionid: int):
             SELECT s.submissionid, s.score, s.time_taken, s.submit_time
             FROM submissions s
             WHERE s.submissionid = %s
+              AND s.userid = %s
+              AND s.assignmentid IS NULL
         """
-        cur.execute(query_sub, (submissionid,))
+        cur.execute(query_sub, (submissionid, current_user_id))
         sub_row = cur.fetchone()
         if not sub_row:
             raise HTTPException(status_code=404, detail="Submission not found")
@@ -482,6 +491,8 @@ def get_submission_history_details(submissionid: int):
             quiz_name=quiz_name,
             questions=questions_detail
         )
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         err_msg = traceback.format_exc()
