@@ -4,6 +4,7 @@ Trả về SSE stream giống format cũ để Frontend không cần sửa gì.
 """
 import json
 import os
+import uuid
 import boto3
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
@@ -17,6 +18,18 @@ REGION = settings.AWS_REGION
 
 LOCAL_DEV = os.getenv("LOCAL_DEV", "0") == "1"
 LOCAL_AGENT_URL = os.getenv("LOCAL_AGENT_URL", "http://localhost:8080/invocations")
+
+
+def _normalize_session_id(session_id: str) -> str:
+    """
+    AWS Bedrock AgentCore yêu cầu runtimeSessionId tối thiểu 33 ký tự.
+    Dùng UUID v5 (deterministic) để đảm bảo cùng session_id luôn cho
+    cùng runtime_session_id → memory được giữ liên tục giữa các lượt chat.
+    """
+    if len(session_id) >= 33:
+        return session_id
+    # uuid.uuid5 tạo UUID 36 ký tự cố định từ cùng 1 input
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, session_id))
 
 
 def _get_bedrock_client():
@@ -68,9 +81,11 @@ async def chat_proxy(request: Request):
             """Gọi Bedrock AgentCore deployed qua boto3"""
             try:
                 client = _get_bedrock_client()
+                # AgentCore yêu cầu runtimeSessionId >= 33 ký tự
+                runtime_session_id = _normalize_session_id(session_id)
                 response = client.invoke_agent_runtime(
                     agentRuntimeArn=f"arn:aws:bedrock-agentcore:{REGION}:982092375481:runtime/{AGENT_ID}",
-                    runtimeSessionId=session_id,
+                    runtimeSessionId=runtime_session_id,
                     payload=json.dumps(request_payload).encode("utf-8"),
                 )
                 stream = response.get("response")
@@ -78,7 +93,14 @@ async def chat_proxy(request: Request):
                     for line in stream.iter_lines():
                         if line:
                             chunk_text = line.decode("utf-8")
-                            yield f"{chunk_text}\n".encode("utf-8")
+                            # Frontend expects SSE format: "data: {...}\n\n"
+                            # AgentCore trả về JSON thuần: {"token": "..."}
+                            # → cần thêm "data: " prefix và double newline
+                            if chunk_text.startswith("data: "):
+                                # Đã đúng SSE format, chỉ cần đảm bảo double newline
+                                yield f"{chunk_text}\n\n".encode("utf-8")
+                            else:
+                                yield f"data: {chunk_text}\n\n".encode("utf-8")
             except Exception as e:
                 error_msg = f"Lỗi kết nối AgentCore: {str(e)}"
                 yield f"data: {json.dumps({'token': error_msg})}\n\n".encode("utf-8")
