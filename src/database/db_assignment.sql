@@ -35,7 +35,7 @@ CREATE TABLE submissions (
     userid INTEGER,
     score NUMERIC(5,2),
     time_taken INTEGER,
-    submit_time TIMESTAMP(6),
+    submitted_at TIMESTAMP(6),
 
     FOREIGN KEY (assignmentid)
         REFERENCES assignments(assignmentid)

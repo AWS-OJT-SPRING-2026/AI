@@ -323,7 +323,7 @@ def submit_quiz(req: SubmissionRequest, current_user_id: int = Depends(get_curre
         # 1. Insert into submissions
         # We use COALESCE/NULL for assignmentid if not provided
         query_sub = """
-            INSERT INTO submissions (assignmentid, userid, score, time_taken, submit_time)
+            INSERT INTO submissions (assignmentid, userid, score, time_taken, submitted_at)
             VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
             RETURNING submissionid
         """
@@ -367,7 +367,7 @@ def get_submission_history_me(current_user_id: int = Depends(get_current_user_id
         # Fetch submissions with subject name (taking first question's subject as representative)
         subject_id_col, subject_name_col = _resolve_subject_columns(cur)
         query = f"""
-            SELECT s.submissionid, s.score, s.time_taken, s.submit_time, sub.{subject_name_col}
+            SELECT s.submissionid, s.score, s.time_taken, s.submitted_at, sub.{subject_name_col}
             FROM submissions s
             LEFT JOIN LATERAL (
                 SELECT qb.subject_id 
@@ -380,7 +380,7 @@ def get_submission_history_me(current_user_id: int = Depends(get_current_user_id
             LEFT JOIN subjects sub ON first_q.subject_id = sub.{subject_id_col}
             WHERE s.userid = %s
               AND s.assignmentid IS NULL
-            ORDER BY s.submit_time DESC
+            ORDER BY s.submitted_at DESC
             LIMIT 20
         """
         cur.execute(query, (current_user_id,))
@@ -418,7 +418,7 @@ def get_submission_history_details(submissionid: int, current_user_id: int = Dep
     try:
         # 1. Fetch submission summary
         query_sub = """
-            SELECT s.submissionid, s.score, s.time_taken, s.submit_time
+            SELECT s.submissionid, s.score, s.time_taken, s.submitted_at
             FROM submissions s
             WHERE s.submissionid = %s
               AND s.userid = %s

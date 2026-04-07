@@ -250,15 +250,15 @@ def simulate_submission(
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        submit_time = datetime.now() - timedelta(minutes=random.randint(0, 60))
+        submitted_at = datetime.now() - timedelta(minutes=random.randint(0, 60))
 
         cur.execute(
             """
-            INSERT INTO submissions (assignmentid, userid, score, time_taken, submit_time)
+            INSERT INTO submissions (assignmentid, userid, score, time_taken, submitted_at)
             VALUES (%s, %s, %s, %s, %s)
             RETURNING submissionid
             """,
-            (assignment_id, user_id, score, time_taken, submit_time)
+            (assignment_id, user_id, score, time_taken, submitted_at)
         )
         submission_id = cur.fetchone()[0]
 
