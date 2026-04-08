@@ -20,6 +20,11 @@ class Settings:
     AWS_REGION: str = os.getenv("AWS_REGION", "ap-southeast-1")
     AWS_BUCKET_NAME: str = os.getenv("AWS_BUCKET_NAME", "")
     
+    # Cognito (RS256 resource-server validation)
+    COGNITO_USER_POOL_ID: str = os.getenv("COGNITO_USER_POOL_ID", "ap-southeast-1_VLlAOfNlC")
+    COGNITO_REGION: str = os.getenv("COGNITO_REGION", "ap-southeast-1")
+    COGNITO_APP_CLIENT_ID: str = os.getenv("COGNITO_APP_CLIENT_ID", "")
+
     # Legacy / compatibility
     DATABASE_NAME: str = os.getenv("DB_NAME", "postgres")
     POSTGRESQL_PASSWORD: str = os.getenv("DB_PASSWORD", "")
