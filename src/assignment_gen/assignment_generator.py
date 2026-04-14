@@ -3,7 +3,6 @@ import json
 import random
 from typing import List, Optional
 from datetime import datetime
-import psycopg2
 from dotenv import load_dotenv
 
 # Import các hàm từ quiz_generator
