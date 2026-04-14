@@ -22,6 +22,8 @@ Yêu cầu sinh câu hỏi:
 - Chỉ có đúng 1 đáp án đúng cho mỗi câu.
 - Kèm theo giải thích chi tiết cho đáp án đúng.
 - Trả về độ khó (`difficulty_level`) là SỐ NGUYÊN (1, 2, hoặc 3).
+- Trường `question_text` chỉ được chứa nội dung câu hỏi. KHÔNG được bao gồm các lựa chọn A, B, C, D vì chúng đã có trong trường `options`.
+- Nếu văn bản có chứa bảng số liệu hoặc danh sách, hãy sử dụng định dạng Markdown Table (có đầy đủ hàng, cột và xuống dòng chuẩn) trong trường `question_text` để đảm bảo hiển thị đẹp trên ứng dụng.
 - Không được trả về bất kỳ văn bản nào ngoài chuẩn JSON. 
 - Không sử dụng định dạng markdown (ví dụ: không dùng ```json). 
 - Không thêm bất kỳ chú thích nào.
@@ -314,8 +316,8 @@ def _resolve_subject_columns(cur) -> Tuple[str, str]:
     return id_col, name_col
 
 
-def get_or_create_question_bank(userid: int, subject_id: int) -> int:
-    """Tạo hoặc lấy ra question_bank của userid với môn học."""
+def get_or_create_question_bank(userid: int, subject_id: int, bank_name: Optional[str] = None) -> int:
+    """Tạo hoặc lấy ra question_bank của userid với môn học và tên file cụ thể."""
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -324,10 +326,17 @@ def get_or_create_question_bank(userid: int, subject_id: int) -> int:
         if not cur.fetchone():
             cur.execute("INSERT INTO users (userid, roleid) VALUES (%s, %s)", (userid, 3)) # Tạo roleid tạm
 
-        cur.execute(
-            "SELECT id FROM question_bank WHERE userid = %s AND subject_id = %s",
-            (userid, subject_id)
-        )
+        if bank_name:
+            cur.execute(
+                "SELECT id FROM question_bank WHERE userid = %s AND subject_id = %s AND bank_name = %s",
+                (userid, subject_id, bank_name)
+            )
+        else:
+            cur.execute(
+                "SELECT id FROM question_bank WHERE userid = %s AND subject_id = %s",
+                (userid, subject_id)
+            )
+            
         row = cur.fetchone()
         if row:
             return row[0]
@@ -341,9 +350,11 @@ def get_or_create_question_bank(userid: int, subject_id: int) -> int:
         subject_row = cur.fetchone()
         subject_name = subject_row[0] if subject_row else f"Subject_{subject_id}"
 
+        actual_bank_name = bank_name if bank_name else f"Bank - User {userid} - {subject_name}"
+
         cur.execute(
             "INSERT INTO question_bank (bank_name, userid, subject_id) VALUES (%s, %s, %s) RETURNING id",
-            (f"Bank - User {userid} - {subject_name}", userid, subject_id)
+            (actual_bank_name, userid, subject_id)
         )
         bank_id = cur.fetchone()[0]
         conn.commit()
@@ -584,7 +595,8 @@ def generate_and_save_quiz(
     theory_text = build_theory_text(content_blocks)
     
     # 2. Bank ID và chống trùng
-    bank_id = get_or_create_question_bank(userid, resolved_subject_id)
+    bank_name = content_blocks[0]["book_name"] if content_blocks else None
+    bank_id = get_or_create_question_bank(userid, resolved_subject_id, bank_name=bank_name)
     existing_questions = fetch_existing_ai_questions_by_bank(bank_id)
     
     # 3. Tính toán phân bổ
