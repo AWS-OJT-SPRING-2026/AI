@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Literal, Optional
-from src.quiz_gen.quiz_generator import get_db_connection
+from src.quiz_gen.quiz_generator import get_db_connection, generate_quiz, save_quiz_to_db, calculate_difficulty_distribution, build_theory_text, fetch_existing_ai_questions_by_bank
 from pydantic import BaseModel
 from datetime import datetime
 from src.core.security import get_current_user_id
@@ -583,6 +583,252 @@ def delete_book(doc_type: str, doc_id: int, user_id: int = Depends(get_current_u
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── Curriculum: list chapters + lessons for a theory book ────────────────────
+
+class LessonResponse(BaseModel):
+    id: int
+    number: int
+    title: str
+
+class ChapterResponse(BaseModel):
+    id: int
+    number: int
+    title: str
+    lessons: List[LessonResponse] = []
+
+
+class LessonContentItem(BaseModel):
+    section_number: int
+    section_title: str
+    subsection_title: Optional[str] = None
+    content: Optional[str] = None
+
+
+@router.get("/theory/lessons/{lesson_id}/content", response_model=List[LessonContentItem])
+def get_lesson_content(lesson_id: int, user_id: int = Depends(get_current_user_id)):
+    """
+    Return content for a lesson using LEFT JOINs from sections.
+    Works even when content_blocks are missing — returns section structure regardless.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT
+                s.section_number,
+                s.section_title,
+                sub.subsection_title,
+                cb.content
+            FROM sections s
+            LEFT JOIN subsections sub ON sub.section_id = s.id
+            LEFT JOIN content_blocks cb ON cb.subsection_id = sub.id
+            WHERE s.lesson_id = %s
+            ORDER BY s.section_number, sub.subsection_number, cb.id
+            """,
+            (lesson_id,),
+        )
+        rows = cur.fetchall()
+        results = []
+        for sec_num, sec_title, sub_title, content in rows:
+            # Always include rows that have content; also include section headers even without content
+            if content or not results or results[-1].section_number != (sec_num or 0):
+                try:
+                    sec_num_int = int(sec_num) if sec_num is not None else 0
+                except (ValueError, TypeError):
+                    sec_num_int = 0
+                results.append(LessonContentItem(
+                    section_number=sec_num_int,
+                    section_title=sec_title or "",
+                    subsection_title=sub_title if sub_title and sub_title.strip() else None,
+                    content=content.strip() if content and content.strip() else None,
+                ))
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/theory/lessons/{lesson_id}/debug")
+def debug_lesson_structure(lesson_id: int, user_id: int = Depends(get_current_user_id)):
+    """Debug: show raw row counts for a lesson to diagnose missing content."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*) FROM sections WHERE lesson_id = %s", (lesson_id,))
+        sections = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM subsections WHERE section_id IN (SELECT id FROM sections WHERE lesson_id = %s)", (lesson_id,))
+        subsections = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM content_blocks WHERE subsection_id IN (SELECT id FROM subsections WHERE section_id IN (SELECT id FROM sections WHERE lesson_id = %s))", (lesson_id,))
+        content_blocks = cur.fetchone()[0]
+        cur.execute("SELECT id, section_number, section_title FROM sections WHERE lesson_id = %s ORDER BY section_number LIMIT 5", (lesson_id,))
+        sample_sections = [{"id": r[0], "number": r[1], "title": r[2]} for r in cur.fetchall()]
+        return {
+            "lesson_id": lesson_id,
+            "sections_count": sections,
+            "subsections_count": subsections,
+            "content_blocks_count": content_blocks,
+            "sample_sections": sample_sections,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.get("/theory/{book_id}/chapters", response_model=List[ChapterResponse])
+def get_book_chapters(book_id: int, user_id: int = Depends(get_current_user_id)):
+    """Return chapters + lessons for a theory book (curriculum detail view)."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT id, chapter_number, title FROM chapters WHERE book_id = %s ORDER BY chapter_number",
+            (book_id,),
+        )
+        chapter_rows = cur.fetchall()
+
+        chapters: List[ChapterResponse] = []
+        for ch_id, ch_num, ch_title in chapter_rows:
+            cur.execute(
+                "SELECT id, lesson_number, title FROM lessons WHERE chapter_id = %s ORDER BY lesson_number",
+                (ch_id,),
+            )
+            lessons = [
+                LessonResponse(id=r[0], number=r[1], title=r[2])
+                for r in cur.fetchall()
+            ]
+            chapters.append(ChapterResponse(id=ch_id, number=ch_num, title=ch_title or "", lessons=lessons))
+
+        return chapters
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── AI question generation for selected question banks ───────────────────────
+
+class GenerateAIForBanksRequest(BaseModel):
+    bank_ids: List[int]
+    num_questions: int
+
+class GenerateAIForBanksResponse(BaseModel):
+    generated_count: int
+    bank_ids: List[int]
+
+
+@router.post("/question-banks/generate-ai", response_model=GenerateAIForBanksResponse)
+def generate_ai_questions_for_banks(
+    request: GenerateAIForBanksRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Generate AI questions for the given question banks and save them (is_ai=True).
+    Questions are generated from theory content of the same subject as each bank.
+    """
+    if not request.bank_ids or request.num_questions <= 0:
+        raise HTTPException(status_code=400, detail="Cần ít nhất 1 ngân hàng và số câu > 0")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    total_generated = 0
+
+    try:
+        # Map bank_id -> subject_id (only for banks owned by this user)
+        subject_bank_pairs: List[tuple] = []
+        for bank_id in request.bank_ids:
+            cur.execute(
+                "SELECT subject_id FROM question_bank WHERE id = %s AND userid = %s",
+                (bank_id, user_id),
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                subject_bank_pairs.append((row[0], bank_id))
+
+        if not subject_bank_pairs:
+            raise HTTPException(
+                status_code=404,
+                detail="Không tìm thấy môn học hợp lệ cho các ngân hàng đã chọn",
+            )
+
+        # Distribute questions equally across banks
+        per_bank = max(1, request.num_questions // len(subject_bank_pairs))
+        remainder = request.num_questions - per_bank * len(subject_bank_pairs)
+
+        for idx, (subject_id, bank_id) in enumerate(subject_bank_pairs):
+            num_for_this_bank = per_bank + (1 if idx < remainder else 0)
+
+            # Find a theory book for this subject
+            cur.execute(
+                "SELECT id FROM books WHERE subject_id = %s ORDER BY id DESC LIMIT 1",
+                (subject_id,),
+            )
+            book_row = cur.fetchone()
+            if not book_row:
+                continue  # No theory content available, skip
+
+            book_id = book_row[0]
+
+            # Fetch theory content for this book
+            cur.execute(
+                """
+                SELECT b.book_name,
+                       ch.chapter_number, ch.title,
+                       l.lesson_number, l.title,
+                       s.section_number, s.section_title,
+                       sub.subsection_number, sub.subsection_title,
+                       cb.content, cb.id
+                FROM content_blocks cb
+                JOIN subsections sub ON cb.subsection_id = sub.id
+                JOIN sections s ON sub.section_id = s.id
+                JOIN lessons l ON s.lesson_id = l.id
+                JOIN chapters ch ON l.chapter_id = ch.id
+                JOIN books b ON ch.book_id = b.id
+                WHERE b.id = %s
+                ORDER BY ch.chapter_number, l.lesson_number, s.section_number, sub.subsection_number, cb.id
+                """,
+                (book_id,),
+            )
+            rows = cur.fetchall()
+            if not rows:
+                continue
+
+            content_blocks = [
+                {
+                    "book_name": r[0], "chapter_number": r[1], "chapter_title": r[2],
+                    "lesson_number": r[3], "lesson_title": r[4],
+                    "section_number": r[5], "section_title": r[6],
+                    "subsection_number": r[7], "subsection_title": r[8],
+                    "content": r[9], "content_block_id": r[10],
+                }
+                for r in rows
+            ]
+
+            theory_text = build_theory_text(content_blocks)
+            existing_questions = fetch_existing_ai_questions_by_bank(bank_id)
+            dist = calculate_difficulty_distribution(num_for_this_bank, None, None, None)
+
+            quiz_data = generate_quiz(text=theory_text, dist=dist, existing_questions=existing_questions)
+            inserted_ids = save_quiz_to_db(quiz_data=quiz_data, bank_id=bank_id)
+            total_generated += len(inserted_ids)
+
+        conn.commit()
+        return GenerateAIForBanksResponse(generated_count=total_generated, bank_ids=request.bank_ids)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi sinh câu hỏi AI: {str(e)}")
     finally:
         cur.close()
         conn.close()

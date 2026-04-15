@@ -1,0 +1,7 @@
+INFO:     Started server process [1080]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:63473 - "GET /api/v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52871 - "GET /api/v1/openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52874 - "GET /api/v1/books/theory/lessons/97/content HTTP/1.1" 401 Unauthorized
