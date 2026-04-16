@@ -30,6 +30,7 @@ def _resolve_subject_columns(cur):
 class Subject(BaseModel):
     subject_id: int
     subject_name: str
+    grade_level: Optional[int] = None
 
 class Chapter(BaseModel):
     id: int
@@ -112,12 +113,55 @@ def get_subjects():
     cur = conn.cursor()
     try:
         subject_id_col, subject_name_col = _resolve_subject_columns(cur)
+        # Check if gradelevel column exists
         cur.execute(
-            f"SELECT {subject_id_col} AS subject_id, {subject_name_col} AS subject_name "
-            f"FROM subjects ORDER BY {subject_id_col}"
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = 'subjects' AND lower(column_name) = 'grade_level'"
         )
-        rows = cur.fetchall()
-        return [{"subject_id": row[0], "subject_name": row[1]} for row in rows]
+        has_grade = cur.fetchone() is not None
+        if has_grade:
+            cur.execute(
+                f"SELECT {subject_id_col} AS subject_id, {subject_name_col} AS subject_name, grade_level "
+                f"FROM subjects ORDER BY {subject_id_col}"
+            )
+            rows = cur.fetchall()
+            return [{"subject_id": row[0], "subject_name": row[1], "grade_level": row[2]} for row in rows]
+        else:
+            cur.execute(
+                f"SELECT {subject_id_col} AS subject_id, {subject_name_col} AS subject_name "
+                f"FROM subjects ORDER BY {subject_id_col}"
+            )
+            rows = cur.fetchall()
+            return [{"subject_id": row[0], "subject_name": row[1]} for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@router.get("/student-grade/{studentid}")
+def get_student_grade(studentid: int):
+    """Lấy grade level của học sinh từ lớp học (classroom) của học sinh."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        subject_id_col, _ = _resolve_subject_columns(cur)
+        cur.execute(
+            f"""
+            SELECT DISTINCT sub.grade_level
+            FROM class_member cm
+            JOIN classrooms c ON c.classid = cm.classid
+            JOIN subjects sub ON sub.{subject_id_col} = c.subjectid
+            WHERE cm.studentid = %s AND sub.grade_level IS NOT NULL
+            ORDER BY sub.grade_level
+            LIMIT 1
+            """,
+            (studentid,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return {"grade_level": None}
+        return {"grade_level": row[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
